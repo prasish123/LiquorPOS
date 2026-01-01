@@ -1,0 +1,304 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PrismaService } from '../prisma.service';
+import { CreateOrderDto, OrderResponseDto, OrderItemResponseDto } from './dto/order.dto';
+import { InventoryAgent, InventoryReservation } from './agents/inventory.agent';
+import { PricingAgent, PricingResult } from './agents/pricing.agent';
+import { ComplianceAgent, ComplianceResult } from './agents/compliance.agent';
+import { PaymentAgent, PaymentResult } from './agents/payment.agent';
+
+interface OrderContext {
+    order: CreateOrderDto;
+    inventory?: InventoryReservation;
+    pricing?: PricingResult;
+    compliance?: ComplianceResult;
+    payment?: PaymentResult;
+    transactionId?: string;
+}
+
+@Injectable()
+export class OrderOrchestrator {
+    private readonly logger = new Logger(OrderOrchestrator.name);
+
+    constructor(
+        private prisma: PrismaService,
+        private eventEmitter: EventEmitter2,
+        private inventoryAgent: InventoryAgent,
+        private pricingAgent: PricingAgent,
+        private complianceAgent: ComplianceAgent,
+        private paymentAgent: PaymentAgent,
+    ) { }
+
+    /**
+     * Process order using SAGA pattern
+     * Each step can be compensated if a later step fails
+     */
+    async processOrder(dto: CreateOrderDto): Promise<OrderResponseDto> {
+        const context: OrderContext = { order: dto };
+
+        try {
+            this.logger.log(`Processing order for location ${dto.locationId}`);
+
+            // Step 1: Inventory check and reservation
+            this.logger.debug('Step 1: Checking and reserving inventory');
+            context.inventory = await this.inventoryAgent.checkAndReserve(
+                dto.locationId,
+                dto.items,
+            );
+
+            // Step 2: Calculate pricing (or use POS provided values)
+            this.logger.debug('Step 2: Determining pricing');
+            if (dto.subtotal !== undefined && dto.total !== undefined) {
+                // Trust POS values
+                this.logger.debug('Using POS provided pricing (Source of Truth)');
+                context.pricing = {
+                    subtotal: dto.subtotal,
+                    totalTax: dto.tax || 0,
+                    totalDiscount: 0, // Simplified for now
+                    total: dto.total,
+                    items: dto.items.map(item => ({
+                        sku: item.sku,
+                        name: 'Item ' + item.sku,
+                        quantity: item.quantity,
+                        unitPrice: item.priceAtSale || 0,
+                        discount: item.discount || 0,
+                        tax: 0,
+                        total: (item.priceAtSale || 0) * item.quantity
+                    }))
+                };
+            } else {
+                context.pricing = await this.pricingAgent.calculate(dto.items);
+            }
+
+            // Step 3: Compliance check (age verification)
+            this.logger.debug('Step 3: Verifying compliance');
+            context.compliance = await this.complianceAgent.verifyAge(
+                dto.items,
+                dto.customerId,
+                dto.ageVerified,
+            );
+
+            // Step 4: Process payment
+            this.logger.debug('Step 4: Processing payment');
+            context.payment = await this.paymentAgent.authorize(
+                context.pricing.total,
+                dto.paymentMethod,
+            );
+
+            if (context.payment.status === 'failed') {
+                throw new Error('Payment authorization failed');
+            }
+
+            // Step 5: Create transaction record
+            this.logger.debug('Step 5: Creating transaction record');
+            const transaction = await this.createTransaction(context);
+            context.transactionId = transaction.id;
+
+            // Step 6: Commit inventory (deduct from stock)
+            this.logger.debug('Step 6: Committing inventory');
+            await this.inventoryAgent.commit(context.inventory, dto.locationId);
+
+            // Step 7: Capture payment (if card)
+            if (dto.paymentMethod === 'card') {
+                this.logger.debug('Step 7: Capturing payment');
+                await this.paymentAgent.capture(
+                    context.payment.paymentId,
+                    context.payment.processorId,
+                );
+            }
+
+            // Step 8: Create payment record
+            await this.paymentAgent.createPaymentRecord(
+                transaction.id,
+                context.payment,
+            );
+
+            // Step 9: Log compliance event
+            await this.complianceAgent.logComplianceEvent(
+                transaction.id,
+                dto.customerId,
+                context.compliance.ageVerified,
+                dto.employeeId,
+            );
+
+            // Step 10: Publish event
+            this.logger.debug('Step 10: Publishing order.created event');
+            await this.publishOrderCreatedEvent(transaction);
+
+            this.logger.log(`Order ${transaction.id} processed successfully`);
+
+            // Return formatted response
+            return this.formatOrderResponse(transaction, context.pricing);
+        } catch (error) {
+            this.logger.error(`Order processing failed: ${error.message}`, error.stack);
+
+            // Compensation (SAGA pattern)
+            await this.compensate(context, error);
+
+            throw error;
+        }
+    }
+
+    /**
+     * Create transaction record in database
+     */
+    private async createTransaction(context: OrderContext) {
+        const { order, pricing } = context;
+
+        if (!pricing) {
+            throw new Error('Pricing information is required');
+        }
+
+        return await this.prisma.transaction.create({
+            data: {
+                locationId: order.locationId,
+                terminalId: order.terminalId,
+                employeeId: order.employeeId,
+                customerId: order.customerId,
+
+                subtotal: pricing.subtotal,
+                tax: pricing.totalTax,
+                discount: pricing.totalDiscount,
+                total: pricing.total,
+
+                paymentMethod: order.paymentMethod,
+                paymentStatus: 'completed',
+                channel: order.channel,
+
+                ageVerified: order.ageVerified || false,
+                ageVerifiedBy: order.ageVerifiedBy,
+                idScanned: order.idScanned || false,
+
+                items: {
+                    create: pricing.items.map(item => ({
+                        sku: item.sku,
+                        name: item.name,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        discount: item.discount,
+                        tax: item.tax,
+                        total: item.total,
+                    })),
+                },
+            },
+            include: {
+                items: true,
+                location: true,
+                customer: true,
+            },
+        });
+    }
+
+    /**
+     * Compensate failed transaction (rollback)
+     */
+    private async compensate(context: OrderContext, error: Error): Promise<void> {
+        this.logger.warn('Starting compensation for failed order');
+
+        // Release inventory reservation
+        if (context.inventory) {
+            this.logger.debug('Compensating: Releasing inventory reservation');
+            try {
+                await this.inventoryAgent.release(
+                    context.inventory,
+                    context.order.locationId,
+                );
+            } catch (err) {
+                this.logger.error('Failed to release inventory', err);
+            }
+        }
+
+        // Void payment
+        if (context.payment && context.payment.status !== 'failed') {
+            this.logger.debug('Compensating: Voiding payment');
+            try {
+                await this.paymentAgent.void(context.payment);
+            } catch (err) {
+                this.logger.error('Failed to void payment', err);
+            }
+        }
+
+        // Log failed transaction
+        if (context.transactionId) {
+            try {
+                await this.prisma.transaction.update({
+                    where: { id: context.transactionId },
+                    data: { paymentStatus: 'refunded' },
+                });
+            } catch (err) {
+                this.logger.error('Failed to update transaction status', err);
+            }
+        }
+
+        // Publish failure event
+        await this.eventEmitter.emit('order.failed', {
+            order: context.order,
+            error: error.message,
+            timestamp: new Date(),
+        });
+    }
+
+    /**
+     * Publish order created event
+     */
+    private async publishOrderCreatedEvent(transaction: any): Promise<void> {
+        await this.eventEmitter.emit('order.created', {
+            transactionId: transaction.id,
+            locationId: transaction.locationId,
+            total: transaction.total,
+            channel: transaction.channel,
+            timestamp: transaction.createdAt,
+        });
+
+        // Also log to event store
+        await this.prisma.eventLog.create({
+            data: {
+                eventType: 'order.created',
+                aggregateId: transaction.id,
+                locationId: transaction.locationId,
+                payload: JSON.stringify({
+                    transactionId: transaction.id,
+                    total: transaction.total,
+                    itemCount: transaction.items.length,
+                }),
+            },
+        });
+    }
+
+    /**
+     * Format transaction for API response
+     */
+    private formatOrderResponse(
+        transaction: any,
+        pricing: PricingResult,
+    ): OrderResponseDto {
+        const items: OrderItemResponseDto[] = pricing.items.map(item => ({
+            id: crypto.randomUUID(),
+            ...item,
+        }));
+
+        return {
+            id: transaction.id,
+            locationId: transaction.locationId,
+            terminalId: transaction.terminalId,
+            employeeId: transaction.employeeId,
+            customerId: transaction.customerId,
+
+            subtotal: transaction.subtotal,
+            tax: transaction.tax,
+            discount: transaction.discount,
+            total: transaction.total,
+
+            paymentMethod: transaction.paymentMethod,
+            paymentStatus: transaction.paymentStatus,
+            channel: transaction.channel,
+
+            ageVerified: transaction.ageVerified,
+            idScanned: transaction.idScanned,
+
+            items,
+
+            createdAt: transaction.createdAt,
+        };
+    }
+}

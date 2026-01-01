@@ -1,0 +1,254 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // Hashed
+  pin       String?  // Quick access for cashiers, 4-6 digits
+  firstName String
+  lastName  String
+  role      Role     @default(CASHIER)
+  active    Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  upc         String?  @unique
+  name        String
+  description String?
+  category    String   // wine, beer, spirits, mixers, snacks
+  
+  // Liquor-specific
+  abv         Float?   // Alcohol by volume
+  volumeMl    Int?     // Bottle size in ml
+  caseSize    Int?     // Bottles per case
+  
+  // Pricing
+  basePrice   Float
+  cost        Float    // For margin tracking
+  
+  // Inventory
+  trackInventory Boolean @default(true)
+  
+  // Compliance
+  ageRestricted Boolean @default(false)
+  
+  // AI Search (will be used for vector embeddings)
+  searchText  String?  // Concatenated text for search
+  embedding   String?  // JSON string of embedding vector
+  
+  // Relations
+  inventory   Inventory[]
+  images      ProductImage[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([category])
+  @@index([sku])
+  @@index([searchText])
+}
+
+model ProductImage {
+  id         String  @id @default(uuid())
+  productId  String
+  url        String
+  isPrimary  Boolean @default(false)
+  
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@index([productId])
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  productId   String
+  locationId  String
+  
+  quantity    Int      // Current stock
+  reserved    Int      @default(0) // Reserved for online orders
+  reorderPoint Int?    // Alert threshold
+  
+  product     Product  @relation(fields: [productId], references: [id])
+  location    Location @relation(fields: [locationId], references: [id])
+  
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([productId, locationId])
+  @@index([locationId])
+}
+
+model Location {
+  id             String   @id @default(uuid())
+  name           String
+  address        String
+  city           String
+  state          String
+  zip            String
+  
+  // Florida license
+  licenseNumber  String?
+  licenseExpiry  DateTime?
+  
+  inventory      Inventory[]
+  transactions   Transaction[]
+  
+  createdAt      DateTime @default(now())
+}
+
+model Transaction {
+  id              String   @id @default(uuid())
+  locationId      String
+  terminalId      String?
+  employeeId      String?
+  customerId      String?
+  
+  // Transaction details
+  subtotal        Float
+  tax             Float
+  discount        Float    @default(0)
+  total           Float
+  
+  // Payment
+  paymentMethod   String   // cash, card, split
+  paymentStatus   String   // completed, refunded, partial_refund
+  
+  // Source
+  channel         String   // counter, web, uber_eats, doordash
+  
+  // Compliance
+  ageVerified     Boolean  @default(false)
+  ageVerifiedBy   String?
+  idScanned       Boolean  @default(false)
+  
+  // Sync status
+  syncedToCloud   Boolean  @default(false)
+  syncedToBackOffice Boolean @default(false)
+  
+  items           TransactionItem[]
+  payments        Payment[]
+  location        Location @relation(fields: [locationId], references: [id])
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([locationId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([locationId, createdAt])
+}
+
+model TransactionItem {
+  id            String      @id @default(uuid())
+  transactionId String
+  
+  sku           String
+  name          String
+  quantity      Int
+  unitPrice     Float
+  discount      Float       @default(0)
+  tax           Float
+  total         Float
+  
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  @@index([transactionId])
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  transactionId String
+  
+  method        String      // cash, card, gift_card
+  amount        Float
+  
+  // Card details (tokenized)
+  cardType      String?     // visa, mastercard, amex
+  last4         String?
+  
+  // Payment processor
+  processorId   String?     // Stripe payment intent ID
+  status        String      // authorized, captured, failed
+  
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime    @default(now())
+  
+  @@index([transactionId])
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  email           String?  @unique
+  phone           String?  @unique
+  firstName       String
+  lastName        String
+  
+  // Loyalty
+  loyaltyPoints   Int      @default(0)
+  lifetimeValue   Float    @default(0)
+  
+  // Compliance
+  ageVerified     Boolean  @default(false)
+  dateOfBirth     DateTime?
+  idScanUrl       String?  // S3 URL for ID scan
+  
+  transactions    Transaction[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model EventLog {
+  id          String   @id @default(uuid())
+  eventType   String   // order.created, inventory.updated, etc.
+  aggregateId String?  // order_id, sku, etc.
+  timestamp   DateTime @default(now())
+  locationId  String?
+  payload     String   // JSON
+  metadata    String?  // JSON (user_id, ip_address, etc.)
+  processed   Boolean  @default(false)
+  processedAt DateTime?
+  
+  @@index([eventType])
+  @@index([aggregateId])
+  @@index([timestamp])
+  @@index([locationId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  eventType   String   // PAYMENT_ACCESS, AGE_VERIFICATION, etc.
+  userId      String?
+  action      String
+  resourceId  String?
+  timestamp   DateTime @default(now())
+  ipAddress   String?
+  userAgent   String?
+  result      String   // success, failure
+  details     String?  // JSON
+  
+  @@index([eventType])
+  @@index([userId])
+  @@index([timestamp])
+}
