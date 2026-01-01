@@ -11,8 +11,7 @@ import * as path from 'path';
 @Injectable()
 export class ConexxusService {
     private readonly logger = new Logger(ConexxusService.name);
-    // Hardcoded path to sample files as requested by user
-    private readonly samplePath = 'E:/ML Projects/POS-Omni/Sample Files';
+    private readonly samplePath = process.env.CONEXXUS_SAMPLE_PATH || path.join(process.cwd(), 'sample-files');
 
     constructor(
         private inventoryService: InventoryService,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, User } from '../auth/AuthProvider';
+import { useAuth } from '../auth/AuthProvider';
 
 export function Login() {
     const [username, setUsername] = useState('');
@@ -16,11 +16,13 @@ export function Login() {
         setError('');
 
         try {
-            const response = await fetch('/api/auth/login', {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include', // Send cookies
                 body: JSON.stringify({ username, password }),
             });
 
@@ -28,17 +30,17 @@ export function Login() {
                 throw new Error('Invalid credentials');
             }
 
-            const user: User = await response.json();
-            login(user);
+            const data = await response.json();
+            login(data.user); // Token is in HttpOnly cookie
 
             // Redirect based on role
-            if (user.role === 'ADMIN' || user.role === 'MANAGER') {
+            if (data.user.role === 'ADMIN' || data.user.role === 'MANAGER') {
                 navigate('/admin');
             } else {
                 navigate('/pos');
             }
         } catch (err) {
-            setError('Login failed. Please checks your credentials.');
+            setError('Login failed. Please check your credentials.');
             console.error(err);
         } finally {
             setLoading(false);

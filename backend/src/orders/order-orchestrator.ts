@@ -6,6 +6,7 @@ import { InventoryAgent, InventoryReservation } from './agents/inventory.agent';
 import { PricingAgent, PricingResult } from './agents/pricing.agent';
 import { ComplianceAgent, ComplianceResult } from './agents/compliance.agent';
 import { PaymentAgent, PaymentResult } from './agents/payment.agent';
+import { AuditService } from './audit.service';
 
 interface OrderContext {
     order: CreateOrderDto;
@@ -27,6 +28,7 @@ export class OrderOrchestrator {
         private pricingAgent: PricingAgent,
         private complianceAgent: ComplianceAgent,
         private paymentAgent: PaymentAgent,
+        private auditService: AuditService,
     ) { }
 
     /**
@@ -113,7 +115,24 @@ export class OrderOrchestrator {
                 context.payment,
             );
 
-            // Step 9: Log compliance event
+            // Step 9: Log payment processing to audit trail
+            await this.auditService.logPaymentProcessing(
+                transaction.id,
+                dto.paymentMethod,
+                context.pricing.total,
+                'success',
+                {
+                    userId: dto.employeeId,
+                    ipAddress: undefined, // Will be set by controller
+                    userAgent: undefined,
+                },
+                {
+                    paymentId: context.payment.paymentId,
+                    processorId: context.payment.processorId,
+                },
+            );
+
+            // Step 10: Log compliance event
             await this.complianceAgent.logComplianceEvent(
                 transaction.id,
                 dto.customerId,
@@ -121,8 +140,8 @@ export class OrderOrchestrator {
                 dto.employeeId,
             );
 
-            // Step 10: Publish event
-            this.logger.debug('Step 10: Publishing order.created event');
+            // Step 11: Publish event
+            this.logger.debug('Step 11: Publishing order.created event');
             await this.publishOrderCreatedEvent(transaction);
 
             this.logger.log(`Order ${transaction.id} processed successfully`);
@@ -131,6 +150,24 @@ export class OrderOrchestrator {
             return this.formatOrderResponse(transaction, context.pricing);
         } catch (error) {
             this.logger.error(`Order processing failed: ${error.message}`, error.stack);
+
+            // Log failed payment processing
+            if (context.payment) {
+                await this.auditService.logPaymentProcessing(
+                    context.transactionId || 'unknown',
+                    dto.paymentMethod,
+                    context.pricing?.total || 0,
+                    'failure',
+                    {
+                        userId: dto.employeeId,
+                        ipAddress: undefined,
+                        userAgent: undefined,
+                    },
+                    {
+                        error: error.message,
+                    },
+                );
+            }
 
             // Compensation (SAGA pattern)
             await this.compensate(context, error);
@@ -168,6 +205,8 @@ export class OrderOrchestrator {
                 ageVerified: order.ageVerified || false,
                 ageVerifiedBy: order.ageVerifiedBy,
                 idScanned: order.idScanned || false,
+
+                idempotencyKey: order.idempotencyKey,
 
                 items: {
                     create: pricing.items.map(item => ({

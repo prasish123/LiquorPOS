@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 export interface User {
     id: string;
@@ -17,34 +17,60 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(() => {
         const stored = localStorage.getItem('user');
         try {
-            if (stored) return JSON.parse(stored);
-            // Default to Admin for DEMO purposes
-            const demoUser: User = {
-                id: 'demo-admin',
-                username: 'admin',
-                role: 'ADMIN',
-                firstName: 'Demo',
-                lastName: 'Admin'
-            };
-            localStorage.setItem('user', JSON.stringify(demoUser));
-            return demoUser;
+            return stored ? JSON.parse(stored) : null;
         } catch {
             return null;
         }
     });
+
+    // Validate session on mount
+    useEffect(() => {
+        const validateSession = async () => {
+            if (user) {
+                try {
+                    const response = await fetch(`${API_URL}/auth/validate`, {
+                        credentials: 'include',
+                    });
+                    if (!response.ok) {
+                        // Cookie invalid or expired, clear user
+                        setUser(null);
+                        localStorage.removeItem('user');
+                    }
+                } catch (err) {
+                    // Network error or backend down, clear user to be safe
+                    console.error('Session validation failed:', err);
+                    setUser(null);
+                    localStorage.removeItem('user');
+                }
+            }
+        };
+        validateSession();
+    }, []); // Run once on mount
 
     const login = (userData: User) => {
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
     };
 
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem('user');
+    const logout = async () => {
+        try {
+            await fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+        } catch (err) {
+            console.error('Logout request failed:', err);
+        } finally {
+            // Always clear local state even if backend call fails
+            setUser(null);
+            localStorage.removeItem('user');
+        }
     };
 
     return (

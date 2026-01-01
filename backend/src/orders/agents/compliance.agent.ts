@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { EncryptionService } from '../../common/encryption.service';
 import { OrderItemDto } from '../dto/order.dto';
 
 export interface ComplianceResult {
@@ -14,7 +15,10 @@ export class ComplianceAgent {
     // Minimum age for alcohol purchase in Florida
     private readonly MINIMUM_AGE = 21;
 
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private encryption: EncryptionService,
+    ) { }
 
     /**
      * Verify age compliance for alcohol purchases
@@ -121,7 +125,7 @@ export class ComplianceAgent {
                 action: ageVerified ? 'VERIFIED' : 'FAILED',
                 resourceId: transactionId,
                 result: ageVerified ? 'success' : 'failure',
-                details: JSON.stringify({ customerId }),
+                details: this.encryption.encrypt(JSON.stringify({ customerId })),
             },
         });
     }

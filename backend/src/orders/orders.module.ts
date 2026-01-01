@@ -7,6 +7,7 @@ import { InventoryAgent } from './agents/inventory.agent';
 import { PricingAgent } from './agents/pricing.agent';
 import { ComplianceAgent } from './agents/compliance.agent';
 import { PaymentAgent } from './agents/payment.agent';
+import { AuditService } from './audit.service';
 import { PrismaService } from '../prisma.service';
 
 @Module({
@@ -18,6 +19,7 @@ import { PrismaService } from '../prisma.service';
     PricingAgent,
     ComplianceAgent,
     PaymentAgent,
+    AuditService,
     PrismaService,
   ],
   controllers: [OrdersController],

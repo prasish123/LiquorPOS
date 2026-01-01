@@ -54,6 +54,7 @@ export const useOfflineStore = create<OfflineStore>((set) => ({
                     const response = await fetch('http://localhost:3000/api/orders', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify({
                             locationId: 'loc-001',
                             terminalId: 'terminal-01',

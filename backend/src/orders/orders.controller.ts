@@ -1,14 +1,105 @@
-import { Controller, Get, Post, Body, Param, Query, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Patch, UseGuards, Req, ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, UpdateOrderDto } from './dto/order.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuditService } from './audit.service';
+import { PrismaService } from '../prisma.service';
 
 @Controller('orders')
+@UseGuards(JwtAuthGuard)
 export class OrdersController {
-    constructor(private readonly ordersService: OrdersService) { }
+    constructor(
+        private readonly ordersService: OrdersService,
+        private readonly auditService: AuditService,
+        private readonly prisma: PrismaService,
+    ) { }
 
     @Post()
-    create(@Body() createOrderDto: CreateOrderDto) {
-        return this.ordersService.create(createOrderDto);
+    async create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
+        const context = {
+            userId: req.user?.id,
+            ipAddress: req.ip || req.connection?.remoteAddress,
+            userAgent: req.headers['user-agent'],
+        };
+
+        // Check for existing transaction with same idempotency key
+        const existingTransaction = await this.prisma.transaction.findUnique({
+            where: { idempotencyKey: createOrderDto.idempotencyKey },
+            include: {
+                items: true,
+                payments: true,
+            },
+        });
+
+        if (existingTransaction) {
+            // Log idempotency check
+            await this.auditService.logIdempotencyCheck(
+                createOrderDto.idempotencyKey,
+                true,
+                existingTransaction.id,
+                context,
+            );
+
+            // Return cached response
+            return {
+                id: existingTransaction.id,
+                locationId: existingTransaction.locationId,
+                terminalId: existingTransaction.terminalId,
+                employeeId: existingTransaction.employeeId,
+                customerId: existingTransaction.customerId,
+                subtotal: existingTransaction.subtotal,
+                tax: existingTransaction.tax,
+                discount: existingTransaction.discount,
+                total: existingTransaction.total,
+                paymentMethod: existingTransaction.paymentMethod,
+                paymentStatus: existingTransaction.paymentStatus,
+                channel: existingTransaction.channel,
+                ageVerified: existingTransaction.ageVerified,
+                idScanned: existingTransaction.idScanned,
+                items: existingTransaction.items,
+                createdAt: existingTransaction.createdAt,
+            };
+        }
+
+        // Process new order
+        try {
+            const result = await this.ordersService.create(createOrderDto);
+
+            // Log successful order creation
+            await this.auditService.logOrderCreation(
+                result.id,
+                'success',
+                context,
+                {
+                    total: result.total,
+                    itemCount: result.items.length,
+                    paymentMethod: result.paymentMethod,
+                },
+            );
+
+            // Log idempotency check for new request
+            await this.auditService.logIdempotencyCheck(
+                createOrderDto.idempotencyKey,
+                false,
+                result.id,
+                context,
+            );
+
+            return result;
+        } catch (error) {
+            // Log failed order creation
+            await this.auditService.logOrderCreation(
+                'unknown',
+                'failure',
+                context,
+                {
+                    error: error.message,
+                    idempotencyKey: createOrderDto.idempotencyKey,
+                },
+            );
+
+            throw error;
+        }
     }
 
     @Get()

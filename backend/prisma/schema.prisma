@@ -145,6 +145,9 @@ model Transaction {
   syncedToCloud   Boolean  @default(false)
   syncedToBackOffice Boolean @default(false)
   
+  // Idempotency
+  idempotencyKey  String?  @unique
+  
   items           TransactionItem[]
   payments        Payment[]
   location        Location @relation(fields: [locationId], references: [id])
@@ -156,6 +159,7 @@ model Transaction {
   @@index([customerId])
   @@index([createdAt])
   @@index([locationId, createdAt])
+  @@index([idempotencyKey])
 }
 
 model TransactionItem {

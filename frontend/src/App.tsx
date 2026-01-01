@@ -8,7 +8,7 @@ import { OfflineBanner } from './components/OfflineBanner';
 import { Toast } from './components/Toast';
 import './index.css';
 
-function ProtectedRoute({ children, allowedRoles }: { children: JSX.Element, allowedRoles?: string[] }) {
+function ProtectedRoute({ children, allowedRoles }: { children: React.JSX.Element, allowedRoles?: string[] }) {
   const { user, isAuthenticated } = useAuth();
 
   // BYPASS: For demo, check if there is a user, but if not, let it through or redirect?
@@ -33,8 +33,11 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
 
-            {/* UNPROTECTED for Demo Stability */}
-            <Route path="/pos" element={<POSTerminal />} />
+            <Route path="/pos" element={
+              <ProtectedRoute allowedRoles={['CASHIER', 'MANAGER', 'ADMIN']}>
+                <POSTerminal />
+              </ProtectedRoute>
+            } />
 
             <Route path="/admin" element={
               <ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']}>
