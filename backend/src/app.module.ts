@@ -19,6 +19,8 @@ import { CommonModule } from './common/common.module';
 import { HealthModule } from './health/health.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
+import { ReportingModule } from './reporting/reporting.module';
+import { BackupModule } from './backup/backup.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 import { AppExceptionFilter } from './common/filters/app-exception.filter';
 
@@ -54,6 +56,8 @@ import { AppExceptionFilter } from './common/filters/app-exception.filter';
     HealthModule,
     WebhooksModule,
     MonitoringModule,
+    ReportingModule,
+    BackupModule,
     AIModule,
     ProductsModule,
     OrdersModule,

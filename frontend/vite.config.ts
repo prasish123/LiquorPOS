@@ -11,6 +11,14 @@ export default defineConfig({
                 {
                     src: 'node_modules/@sqlite.org/sqlite-wasm/sqlite-wasm/jswasm/*',
                     dest: '.'
+                },
+                {
+                    src: 'public/service-worker.js',
+                    dest: '.'
+                },
+                {
+                    src: 'public/manifest.json',
+                    dest: '.'
                 }
             ]
         })
@@ -47,5 +55,7 @@ export default defineConfig({
                 },
             },
         },
+        // Ensure service worker is copied to dist root
+        outDir: 'dist',
     },
 })

@@ -34,7 +34,11 @@
     "load-test:stress": "artillery run test/load/stress-test.yml",
     "load-test:spike": "artillery run test/load/spike-test.yml",
     "load-test:validate": "node test/load/validate-setup.js",
-    "load-test:fix": "node test/load/agentic-fix-loop.js"
+    "load-test:fix": "node test/load/agentic-fix-loop.js",
+    "dr:restore": "ts-node scripts/disaster-recovery/restore-database.ts",
+    "dr:test": "ts-node scripts/disaster-recovery/test-dr-procedures.ts",
+    "dr:list-backups": "curl http://localhost:3000/api/backup/list -H \"Authorization: Bearer $ADMIN_TOKEN\"",
+    "backup:create": "curl -X POST http://localhost:3000/api/backup/create -H \"Authorization: Bearer $ADMIN_TOKEN\""
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

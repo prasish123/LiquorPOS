@@ -74,6 +74,22 @@
   padding: 0;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  /* Touch optimization */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection for inputs and content areas */
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 html,
@@ -81,6 +97,10 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
+  /* Prevent pull-to-refresh on mobile */
+  overscroll-behavior-y: contain;
+  /* Smooth scrolling for touch devices */
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -90,6 +110,9 @@ body {
   background: var(--gradient-background);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Optimize for touch */
+  touch-action: manipulation;
 }
 
 #root {
@@ -151,7 +174,7 @@ h6 {
 }
 
 /* ==========================================================================
-   Buttons
+   Buttons - Touch Optimized
    ========================================================================== */
 
 .btn {
@@ -165,6 +188,13 @@ h6 {
   cursor: pointer;
   transition: var(--transition-base);
   user-select: none;
+  /* Touch optimization - minimum 44x44px tap target (Apple HIG) */
+  min-height: 44px;
+  min-width: 44px;
+  /* Prevent double-tap zoom */
+  touch-action: manipulation;
+  /* Better touch feedback */
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.2);
 }
 
 /* Primary Action Button (CTAs) */
@@ -177,13 +207,17 @@ h6 {
   box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
 }
 
-.btn-primary:not(:disabled):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+/* Touch devices - use active state instead of hover */
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+  }
 }
 
 .btn-primary:active {
   transform: translateY(0);
+  opacity: 0.9;
 }
 
 .btn-primary:disabled {
@@ -204,9 +238,15 @@ h6 {
   font-weight: 600;
 }
 
-.btn-secondary:not(:disabled):hover {
-  background: rgba(99, 102, 241, 0.05);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .btn-secondary:not(:disabled):hover {
+    background: rgba(99, 102, 241, 0.05);
+    transform: translateY(-2px);
+  }
+}
+
+.btn-secondary:active {
+  background: rgba(99, 102, 241, 0.1);
 }
 
 /* Success Button (Variant of Primary but with Green) */
@@ -220,29 +260,48 @@ h6 {
   box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
 }
 
-.btn-success:not(:disabled):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
-  filter: brightness(1.1);
+@media (hover: hover) and (pointer: fine) {
+  .btn-success:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
+    filter: brightness(1.1);
+  }
 }
 
-/* Small Control Button */
+.btn-success:active {
+  opacity: 0.9;
+}
+
+/* Small Control Button - Touch optimized to 44x44px minimum */
 .btn-small {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   background: white;
   color: var(--color-primary);
-  font-size: 16px;
+  font-size: 18px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid var(--color-border);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.btn-small:hover {
+@media (hover: hover) and (pointer: fine) {
+  .btn-small:hover {
+    background: var(--color-primary);
+    color: white;
+    transform: scale(1.1);
+    border-color: var(--color-primary);
+  }
+}
+
+.btn-small:active {
   background: var(--color-primary);
   color: white;
-  transform: scale(1.1);
   border-color: var(--color-primary);
+  transform: scale(0.95);
 }
 
 /* Danger/Clear Button (Text only usually, or small outlined) */
@@ -263,23 +322,32 @@ h6 {
   border-color: var(--color-error);
 }
 
-/* Inputs */
+/* Inputs - Touch Optimized */
 .input {
   width: 100%;
   padding: 16px 20px;
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 16px; /* Minimum 16px to prevent iOS zoom */
   color: var(--color-text-primary);
   background: white;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   transition: var(--transition-base);
+  min-height: 48px; /* Touch-friendly height */
+  touch-action: manipulation;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+/* Prevent zoom on iOS when focusing inputs */
+@supports (-webkit-touch-callout: none) {
+  .input {
+    font-size: max(16px, 1rem);
+  }
 }
 
 /* ==========================================================================
@@ -408,11 +476,135 @@ h6 {
   /* CRITICAL: Allow grid container itself to be constrained by flex parent */
 }
 
-@media (max-width: 1024px) {
+/* ==========================================================================
+   Tablet Responsive Breakpoints (10-13" tablets: 768px - 1366px)
+   ========================================================================== */
+
+/* Large tablets in landscape (iPad Pro 12.9", Surface Pro) - 1024px+ */
+@media (min-width: 1024px) and (max-width: 1366px) {
+  .app-main {
+    grid-template-columns: 1fr 380px;
+    gap: var(--space-5);
+  }
+  
+  .app-container {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+  
+  .product-card {
+    height: 240px;
+  }
+  
+  .search-results {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+/* Medium tablets in landscape (iPad 10.2", iPad Air) - 768px to 1024px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-main {
+    grid-template-columns: 1fr 360px;
+    gap: var(--space-4);
+  }
+  
+  .app-container {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+  
+  .app-header {
+    padding: var(--space-4) var(--space-6);
+  }
+  
+  .app-title {
+    font-size: 24px;
+  }
+  
+  .product-card {
+    height: 220px;
+  }
+  
+  .search-results {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--space-3);
+  }
+  
+  .btn-primary,
+  .btn-secondary,
+  .btn-success {
+    padding: 16px 28px;
+    font-size: 15px;
+  }
+}
+
+/* Small tablets and large phones in landscape - below 768px */
+@media (max-width: 767px) {
   .app-main {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
-    /* Stack interaction */
+    gap: var(--space-3);
+  }
+  
+  .app-container {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+  
+  .app-header {
+    padding: var(--space-3) var(--space-4);
+  }
+  
+  .app-title {
+    font-size: 20px;
+  }
+  
+  .product-card {
+    height: 200px;
+  }
+  
+  .search-results {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--space-2);
+  }
+  
+  .cart-section {
+    max-height: 50vh;
+  }
+}
+
+/* Portrait orientation optimization */
+@media (orientation: portrait) {
+  .app-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  
+  .cart-section {
+    max-height: 45vh;
+    overflow: hidden;
+  }
+  
+  .cart-items {
+    max-height: 25vh;
+  }
+}
+
+/* Landscape orientation optimization (primary for POS terminals) */
+@media (orientation: landscape) and (min-width: 768px) {
+  .app-main {
+    grid-template-columns: 1fr 380px;
+  }
+}
+
+/* High DPI displays (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .tile-card {
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.06);
+  }
+  
+  .btn-primary {
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
   }
 }
 
@@ -457,7 +649,7 @@ h6 {
   scrollbar-width: thin;
 }
 
-/* Product Tile Specifics */
+/* Product Tile Specifics - Touch Optimized */
 .product-card {
   /* Base tile class should be applied, but we override padding */
   padding: 0;
@@ -468,11 +660,20 @@ h6 {
   text-align: left;
   background: white;
   /* Ensure non-transparent for tile content */
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.1);
 }
 
 /* Override base tile padding if applied */
 .tile-card.product-card {
   padding: 0;
+}
+
+/* Touch feedback for product cards */
+.product-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.15);
 }
 
 .product-image-area {
@@ -722,7 +923,7 @@ h6 {
   background-clip: text;
 }
 
-/* Payment Methods */
+/* Payment Methods - Touch Optimized */
 .payment-methods {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -736,19 +937,29 @@ h6 {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-4);
+  padding: var(--space-5);
+  min-height: 88px; /* Double the minimum tap target for better UX */
   background: white;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition-base);
   font-weight: 600;
+  font-size: 15px;
   color: var(--color-text-secondary);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.1);
 }
 
-.payment-btn:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .payment-btn:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+  }
+}
+
+.payment-btn:active {
+  transform: scale(0.98);
 }
 
 .payment-btn.active {
@@ -820,4 +1031,143 @@ h6 {
 
 .toast-error {
   background: var(--color-error);
+}
+
+/* ==========================================================================
+   PWA Install Prompt
+   ========================================================================== */
+
+.pwa-install-prompt {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: 90%;
+  width: 500px;
+  animation: slideInUp 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.pwa-install-content {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.pwa-install-icon {
+  width: 56px;
+  height: 56px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.pwa-install-text {
+  flex: 1;
+}
+
+.pwa-install-text h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.pwa-install-text p {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.pwa-install-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.pwa-install-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-icon-only {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-base);
+  touch-action: manipulation;
+}
+
+.btn-icon-only:active {
+  background: rgba(0, 0, 0, 0.05);
+  transform: scale(0.95);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-icon-only:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* Mobile adjustments for PWA prompt */
+@media (max-width: 767px) {
+  .pwa-install-prompt {
+    bottom: 16px;
+    width: calc(100% - 32px);
+  }
+  
+  .pwa-install-content {
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+  
+  .pwa-install-icon {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .pwa-install-text h3 {
+    font-size: 16px;
+  }
+  
+  .pwa-install-text p {
+    font-size: 13px;
+  }
+  
+  .pwa-install-btn {
+    padding: 10px 20px;
+    font-size: 13px;
+  }
 }

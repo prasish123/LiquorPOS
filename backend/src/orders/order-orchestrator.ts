@@ -11,15 +11,19 @@ import { InventoryAgent, InventoryReservation } from './agents/inventory.agent';
 import { PricingAgent, PricingResult } from './agents/pricing.agent';
 import { ComplianceAgent, ComplianceResult } from './agents/compliance.agent';
 import { PaymentAgent, PaymentResult } from './agents/payment.agent';
+import { OfflinePaymentAgent, OfflinePaymentResult } from './agents/offline-payment.agent';
 import { AuditService } from './audit.service';
+import { NetworkStatusService } from '../common/network-status.service';
+import { OfflineQueueService } from '../common/offline-queue.service';
 
 interface OrderContext {
   order: CreateOrderDto;
   inventory?: InventoryReservation;
   pricing?: PricingResult;
   compliance?: ComplianceResult;
-  payment?: PaymentResult;
+  payment?: PaymentResult | OfflinePaymentResult;
   transactionId?: string;
+  offlineMode?: boolean;
 }
 
 @Injectable()
@@ -33,8 +37,16 @@ export class OrderOrchestrator {
     private pricingAgent: PricingAgent,
     private complianceAgent: ComplianceAgent,
     private paymentAgent: PaymentAgent,
+    private offlinePaymentAgent: OfflinePaymentAgent,
     private auditService: AuditService,
-  ) {}
+    private networkStatus: NetworkStatusService,
+    private offlineQueue: OfflineQueueService,
+  ) {
+    // Register handler for offline transaction processing
+    this.offlineQueue.registerHandler('transaction', (payload) =>
+      this.processOfflineTransaction(payload),
+    );
+  }
 
   /**
    * Process order using SAGA pattern
@@ -88,15 +100,58 @@ export class OrderOrchestrator {
         dto.ageVerified,
       );
 
-      // Step 4: Process payment
+      // Step 4: Process payment (with offline fallback)
       this.logger.debug('Step 4: Processing payment');
-      context.payment = await this.paymentAgent.authorize(
-        context.pricing.total,
-        dto.paymentMethod,
-      );
-
-      if (context.payment.status === 'failed') {
-        throw new Error('Payment authorization failed');
+      
+      // Check if we're online and Stripe is available
+      const isStripeAvailable = this.networkStatus.isStripeAvailable();
+      const isOnline = this.networkStatus.isOnline();
+      
+      if (!isStripeAvailable && dto.paymentMethod === 'card') {
+        this.logger.warn('Stripe unavailable, attempting offline payment authorization');
+        
+        // Try offline payment
+        context.payment = await this.offlinePaymentAgent.authorizeOffline(
+          context.pricing.total,
+          dto.paymentMethod,
+          dto.locationId,
+          {
+            employeeId: dto.employeeId,
+            terminalId: dto.terminalId,
+          },
+        );
+        context.offlineMode = true;
+        
+        if (context.payment.status === 'failed') {
+          throw new Error(
+            context.payment.errorMessage || 'Offline payment authorization failed',
+          );
+        }
+        
+        // Queue payment capture for when we're back online
+        if ('requiresOnlineCapture' in context.payment && context.payment.requiresOnlineCapture) {
+          await this.offlineQueue.enqueue(
+            'payment_capture',
+            {
+              paymentId: context.payment.paymentId,
+              processorId: context.payment.processorId,
+              amount: context.payment.amount,
+              locationId: dto.locationId,
+            },
+            9, // High priority
+          );
+        }
+      } else {
+        // Normal online payment processing
+        context.payment = await this.paymentAgent.authorize(
+          context.pricing.total,
+          dto.paymentMethod,
+        );
+        context.offlineMode = false;
+        
+        if (context.payment.status === 'failed') {
+          throw new Error('Payment authorization failed');
+        }
       }
 
       // Step 5: Create transaction record
@@ -108,13 +163,15 @@ export class OrderOrchestrator {
       this.logger.debug('Step 6: Committing inventory');
       await this.inventoryAgent.commit(context.inventory, dto.locationId);
 
-      // Step 7: Capture payment (if card)
-      if (dto.paymentMethod === 'card') {
+      // Step 7: Capture payment (if card and not offline)
+      if (dto.paymentMethod === 'card' && !context.offlineMode) {
         this.logger.debug('Step 7: Capturing payment');
         await this.paymentAgent.capture(
           context.payment.paymentId,
           context.payment.processorId,
         );
+      } else if (context.offlineMode) {
+        this.logger.log('Skipping payment capture (offline mode - will capture when online)');
       }
 
       // Step 8: Create payment record
@@ -356,5 +413,29 @@ export class OrderOrchestrator {
 
       createdAt: transaction.createdAt,
     };
+  }
+
+  /**
+   * Process offline transaction (called by queue processor)
+   */
+  private async processOfflineTransaction(payload: any): Promise<void> {
+    this.logger.log(`Processing offline transaction: ${payload.transactionId}`);
+
+    // This would handle any post-processing needed for offline transactions
+    // For example, syncing with external systems when back online
+    
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: payload.transactionId },
+      include: { items: true },
+    });
+
+    if (!transaction) {
+      throw new Error(`Transaction ${payload.transactionId} not found`);
+    }
+
+    // Publish event for external systems
+    await this.publishOrderCreatedEvent(transaction);
+
+    this.logger.log(`Offline transaction ${payload.transactionId} processed successfully`);
   }
 }

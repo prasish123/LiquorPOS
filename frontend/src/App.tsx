@@ -6,6 +6,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/Admin/Dashboard';
 import { OfflineBanner } from './components/OfflineBanner';
 import { Toast } from './components/Toast';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import './index.css';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.JSX.Element, allowedRoles?: string[] }) {
@@ -30,6 +31,7 @@ function App() {
         <div className="app bg-black min-h-screen text-white">
           <Toast />
           <OfflineBanner />
+          <PWAInstallPrompt />
           <Routes>
             <Route path="/login" element={<Login />} />
 
