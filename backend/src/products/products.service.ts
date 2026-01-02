@@ -1,15 +1,37 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { LocalAIService } from '../ai/local-ai.service';
+import { LoggerService } from '../common/logger.service';
 import {
   CreateProductDto,
   UpdateProductDto,
   SearchProductDto,
 } from './dto/product.dto';
+import {
+  NotFoundException as AppNotFoundException,
+  ErrorCode,
+} from '../common/errors';
+
+export interface ProductWithScore {
+  id: string;
+  name: string;
+  category: string;
+  embedding?: string | null;
+  similarity?: number;
+  finalScore?: number;
+  sku?: string;
+  basePrice?: number;
+  description?: string | null;
+  abv?: number | null;
+  volumeMl?: number | null;
+  [key: string]: any; // Allow additional properties
+}
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new LoggerService('ProductsService');
+
   constructor(
     private prisma: PrismaService,
     private aiService: LocalAIService,
@@ -37,7 +59,9 @@ export class ProductsService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      console.warn('Failed to generate local embedding:', errorMessage);
+      this.logger.warn('Failed to generate local embedding', {
+        error: errorMessage,
+      });
     }
 
     const product = await this.prisma.product.create({
@@ -112,7 +136,11 @@ export class ProductsService {
     });
 
     if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new AppNotFoundException(
+        ErrorCode.PRODUCT_NOT_FOUND,
+        'Product',
+        id,
+      );
     }
 
     return product;
@@ -131,7 +159,11 @@ export class ProductsService {
     });
 
     if (!product) {
-      throw new NotFoundException(`Product with SKU ${sku} not found`);
+      throw new AppNotFoundException(
+        ErrorCode.PRODUCT_NOT_FOUND,
+        'Product',
+        sku,
+      );
     }
 
     return product;
@@ -204,7 +236,11 @@ export class ProductsService {
           data: { embedding: JSON.stringify(vector) },
         });
       } catch (e) {
-        console.warn(`Failed to update embedding for product ${id}:`, e);
+        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+        this.logger.warn('Failed to update embedding for product', {
+          productId: id,
+          error: errorMessage,
+        });
       }
     }
 
@@ -278,7 +314,10 @@ export class ProductsService {
   /**
    * AI-powered semantic search using Local Embeddings (ContextIQ style)
    */
-  async searchWithAI(query: string, limit: number = 20) {
+  async searchWithAI(
+    query: string,
+    limit: number = 20,
+  ): Promise<ProductWithScore[]> {
     try {
       // Generate embedding for query
       const queryEmbedding = await this.aiService.generateEmbedding(query);
@@ -291,20 +330,12 @@ export class ProductsService {
       });
 
       if (products.length === 0) {
-        console.log('No embeddings found, returning regular search');
-        return this.search({ query, limit });
+        this.logger.debug('No embeddings found, returning regular search');
+        const searchResults = await this.search({ query, limit });
+        return searchResults.map((p) => ({ ...p, similarity: 0 }));
       }
 
       // Calculate semantic scores
-      interface ProductWithScore {
-        id: string;
-        name: string;
-        category: string;
-        embedding?: string;
-        similarity: number;
-        finalScore?: number;
-      }
-
       const productsWithScores = products.map((product): ProductWithScore => {
         let similarity = 0;
         try {
@@ -318,7 +349,9 @@ export class ProductsService {
           }
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_err) {
-          console.warn(`Failed to parse embedding for product ${product.id}`);
+          this.logger.warn('Failed to parse embedding for product', {
+            productId: product.id,
+          });
         }
         return { ...product, similarity } as ProductWithScore;
       });
@@ -326,7 +359,7 @@ export class ProductsService {
       // HYBRID LOGIC: Boost score if keywords match
       const lowerQuery = query.toLowerCase();
       const results = productsWithScores.map((product): ProductWithScore => {
-        let score = product.similarity;
+        let score = product.similarity || 0;
 
         // Boost for exact name match
         if (product.name.toLowerCase().includes(lowerQuery)) {
@@ -346,8 +379,15 @@ export class ProductsService {
         .sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0))
         .slice(0, limit);
     } catch (error) {
-      console.error('AI search failed, falling back to regular search:', error);
-      return this.search({ query, limit });
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        'AI search failed, falling back to regular search',
+        undefined,
+        { error: errorMessage },
+      );
+      const searchResults = await this.search({ query, limit });
+      return searchResults.map((p) => ({ ...p, similarity: 0 }));
     }
   }
 }

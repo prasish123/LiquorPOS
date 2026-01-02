@@ -106,6 +106,10 @@ model Location {
   state          String
   zip            String
   
+  // Tax configuration
+  taxRate        Float    @default(0.07) // Default 7% (Florida state tax)
+  countyTaxRate  Float?   // Optional county-specific tax
+  
   // Florida license
   licenseNumber  String?
   licenseExpiry  DateTime?

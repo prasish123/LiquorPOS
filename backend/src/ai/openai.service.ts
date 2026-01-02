@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
+import { LoggerService } from '../common/logger.service';
 
 @Injectable()
 export class OpenAIService {
   private openai: OpenAI | null = null;
+  private readonly logger = new LoggerService('OpenAIService');
 
   constructor() {
     // Only initialize if API key is provided
@@ -12,7 +14,7 @@ export class OpenAIService {
         apiKey: process.env.OPENAI_API_KEY,
       });
     } else {
-      console.warn(
+      this.logger.warn(
         'OPENAI_API_KEY not set - AI search will fall back to regular search',
       );
     }
@@ -31,7 +33,11 @@ export class OpenAIService {
 
       return response.data[0].embedding;
     } catch (error) {
-      console.error('Error generating embedding:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('Error generating embedding', undefined, {
+        error: errorMessage,
+      });
       throw error;
     }
   }

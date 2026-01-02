@@ -1,10 +1,12 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { LoggerService } from './common/logger.service';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private prisma: PrismaClient;
+  private readonly logger = new LoggerService('PrismaService');
 
   constructor() {
     // Create Prisma adapter with database URL
@@ -18,12 +20,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     await this.prisma.$connect();
-    console.log('✅ Database connected');
+    this.logger.log('✅ Database connected');
   }
 
   async onModuleDestroy() {
     await this.prisma.$disconnect();
-    console.log('👋 Database disconnected');
+    this.logger.log('👋 Database disconnected');
   }
 
   // Delegate all Prisma client properties
@@ -69,5 +71,27 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get user() {
     return this.prisma.user;
+  }
+
+  // Expose $transaction for advanced operations
+  get $transaction() {
+    return this.prisma.$transaction.bind(this.prisma);
+  }
+
+  // Expose other Prisma client methods for health checks and utilities
+  $connect() {
+    return this.prisma.$connect();
+  }
+
+  $disconnect() {
+    return this.prisma.$disconnect();
+  }
+
+  $executeRaw(...args: Parameters<PrismaClient['$executeRaw']>) {
+    return this.prisma.$executeRaw(...args);
+  }
+
+  $queryRaw(...args: Parameters<PrismaClient['$queryRaw']>) {
+    return this.prisma.$queryRaw(...args);
   }
 }

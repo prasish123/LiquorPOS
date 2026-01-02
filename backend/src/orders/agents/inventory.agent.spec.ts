@@ -302,7 +302,8 @@ describe('InventoryAgent', () => {
           const txContext = {
             product: {
               findUnique: jest.fn().mockImplementation(({ where }) => {
-                const product = mockProducts[where.sku as keyof typeof mockProducts];
+                const product =
+                  mockProducts[where.sku as keyof typeof mockProducts];
                 return Promise.resolve(product);
               }),
             },
@@ -312,9 +313,13 @@ describe('InventoryAgent', () => {
             $queryRaw: jest.fn().mockImplementation(() => {
               callCount++;
               if (callCount === 1) {
-                return Promise.resolve([{ id: 'inv-001', quantity: 10, reserved: 0 }]);
+                return Promise.resolve([
+                  { id: 'inv-001', quantity: 10, reserved: 0 },
+                ]);
               }
-              return Promise.resolve([{ id: 'inv-002', quantity: 20, reserved: 0 }]);
+              return Promise.resolve([
+                { id: 'inv-002', quantity: 20, reserved: 0 },
+              ]);
             }),
           };
 
@@ -423,7 +428,10 @@ describe('InventoryAgent', () => {
             inventory: {
               update: jest.fn().mockImplementation(({ data }) => {
                 capturedUpdate = data as { reserved: number };
-                return Promise.resolve({ id: 'inv-001', reserved: data.reserved });
+                return Promise.resolve({
+                  id: 'inv-001',
+                  reserved: data.reserved,
+                });
               }),
             },
             $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
@@ -560,4 +568,3 @@ describe('InventoryAgent', () => {
     });
   });
 });
-

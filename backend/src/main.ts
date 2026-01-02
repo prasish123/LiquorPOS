@@ -1,14 +1,16 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigValidationService } from './common/config-validation.service';
+import { LoggerService } from './common/logger.service';
 import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
 import { randomBytes } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
-  const logger = new Logger('Bootstrap');
+  const logger = new LoggerService('Bootstrap');
 
   // CRITICAL: Validate environment variables BEFORE creating the app
   // This ensures we fail fast if configuration is invalid
@@ -32,6 +34,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Request logging middleware for audit trail
+  const requestLogger = new LoggerService('HTTP');
   app.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     const { method, originalUrl, ip } = req;
@@ -43,10 +46,27 @@ async function bootstrap() {
       const duration = Date.now() - start;
       const { statusCode } = res;
 
-      // Log format: [timestamp] METHOD /path STATUS duration user IP
-      console.log(
-        `[${new Date().toISOString()}] ${method} ${originalUrl} ${statusCode} ${duration}ms ${user} ${ip}`,
-      );
+      // Structured logging with metadata
+      const logLevel =
+        statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
+      const message = `${method} ${originalUrl} ${statusCode} ${duration}ms`;
+
+      const metadata = {
+        method,
+        path: originalUrl,
+        statusCode,
+        duration,
+        user,
+        ip,
+      };
+
+      if (logLevel === 'error') {
+        requestLogger.error(message, undefined, metadata);
+      } else if (logLevel === 'warn') {
+        requestLogger.warn(message, metadata);
+      } else {
+        requestLogger.log(message, metadata);
+      }
 
       // For critical operations, log to audit table (orders, payments, inventory changes)
       if (originalUrl.startsWith('/orders') && method !== 'GET') {
@@ -72,11 +92,9 @@ async function bootstrap() {
 
     // Validate CSRF token on state-changing requests
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-      // Exempt auth endpoints (pre-authentication)
-      if (
-        req.path.startsWith('/auth/login') ||
-        req.path.startsWith('/auth/csrf-token')
-      ) {
+      // Only exempt GET endpoint for CSRF token retrieval
+      // Login endpoint MUST include CSRF token for security
+      if (req.path.startsWith('/auth/csrf-token')) {
         return next();
       }
 
@@ -84,7 +102,10 @@ async function bootstrap() {
       const headerToken = req.headers['x-csrf-token'] as string | undefined;
 
       if (!cookieToken || cookieToken !== headerToken) {
-        return res.status(403).json({ message: 'Invalid CSRF token' });
+        return res.status(403).json({
+          message: 'Invalid CSRF token',
+          error: 'CSRF_TOKEN_MISMATCH',
+        });
       }
     }
     next();
@@ -112,15 +133,86 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Swagger API Documentation
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('POS-Omni Liquor POS API')
+    .setDescription(
+      'REST API for POS-Omni liquor store point-of-sale system. ' +
+        'Supports order processing, inventory management, customer management, and external integrations.',
+    )
+    .setVersion('1.0.0')
+    .setContact(
+      'POS-Omni Support',
+      'https://github.com/pos-omni/liquor-pos',
+      'support@pos-omni.example.com',
+    )
+    .setLicense('MIT', 'https://opensource.org/licenses/MIT')
+    .addTag('auth', 'Authentication and authorization')
+    .addTag('orders', 'Order processing and management')
+    .addTag('products', 'Product catalog and search')
+    .addTag('inventory', 'Inventory tracking and management')
+    .addTag('customers', 'Customer management')
+    .addTag('health', 'Health check endpoints')
+    .addTag('integrations', 'External system integrations')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Enter JWT token',
+      },
+      'JWT',
+    )
+    .addCookieAuth('csrf-token', {
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'csrf-token',
+      description: 'CSRF protection token (automatically set)',
+    })
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-csrf-token',
+        description:
+          'CSRF token from cookie (required for POST/PUT/PATCH/DELETE)',
+      },
+      'CSRF',
+    )
+    .addServer('http://localhost:3000', 'Local Development')
+    .addServer('https://api.pos-omni.example.com', 'Production')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+
+  // Serve Swagger UI at /api/docs
+  SwaggerModule.setup('api/docs', app, document, {
+    customSiteTitle: 'POS-Omni API Documentation',
+    customfavIcon: 'https://nestjs.com/img/logo-small.svg',
+    customCss: '.swagger-ui .topbar { display: none }',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      showRequestDuration: true,
+      tryItOutEnabled: true,
+    },
+  });
+
+  logger.log(
+    `📚 API Documentation available at: http://localhost:${config.PORT || 3000}/api/docs`,
+  );
+
   const port = config.PORT || 3000;
   await app.listen(port);
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
 }
 
 bootstrap().catch((error: unknown) => {
-  const logger = new Logger('Bootstrap');
+  const logger = new LoggerService('Bootstrap');
   logger.error('❌ Application failed to start');
   const errorMessage = error instanceof Error ? error.message : String(error);
-  logger.error(errorMessage);
+  const stack = error instanceof Error ? error.stack : undefined;
+  logger.error(errorMessage, stack);
   process.exit(1);
 });

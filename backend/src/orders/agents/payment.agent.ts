@@ -14,7 +14,7 @@ export interface PaymentResult {
 }
 
 export interface StripeConfig {
-  apiVersion: '2024-12-18.acacia';
+  apiVersion: '2025-12-15.clover';
   timeout: 30000; // 30 seconds
   maxRetries: 3;
 }
@@ -42,12 +42,14 @@ export class PaymentAgent {
 
     try {
       this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-        apiVersion: '2024-12-18.acacia',
+        apiVersion: '2025-12-15.clover',
         timeout: 30000,
         maxNetworkRetries: 3,
         typescript: true,
       });
-      this.logger.log('Stripe client initialized successfully');
+      this.logger.log(
+        'Stripe client initialized successfully with API version 2025-12-15.clover',
+      );
     } catch (error) {
       this.logger.error('Failed to initialize Stripe client', error);
       throw error;
@@ -159,6 +161,7 @@ export class PaymentAgent {
     }
 
     try {
+      // Capture the payment intent
       const paymentIntent =
         await this.stripe.paymentIntents.capture(processorId);
 
@@ -167,21 +170,48 @@ export class PaymentAgent {
           `Status: ${paymentIntent.status}`,
       );
 
-      // Update payment record with card details if available
-      if (paymentIntent.charges.data.length > 0) {
-        const charge = paymentIntent.charges.data[0];
-        const paymentMethod = charge?.payment_method_details;
+      // Retrieve the payment intent with expanded charges to get card details
+      // Note: In Stripe API 2025-12-15.clover, charges are not automatically included
+      // We need to expand them or retrieve them separately
+      try {
+        const expandedPaymentIntent = await this.stripe.paymentIntents.retrieve(
+          processorId,
+          {
+            expand: ['latest_charge.payment_method_details'],
+          },
+        );
 
-        if (paymentMethod?.card) {
-          await this.prisma.payment.updateMany({
-            where: { processorId },
-            data: {
-              cardType: String(paymentMethod.card.brand),
-              last4: String(paymentMethod.card.last4),
-              status: 'captured',
-            },
-          });
+        // Access the latest charge
+        const latestCharge = expandedPaymentIntent.latest_charge;
+
+        if (
+          latestCharge &&
+          typeof latestCharge === 'object' &&
+          'payment_method_details' in latestCharge
+        ) {
+          const paymentMethodDetails = (latestCharge as any)
+            .payment_method_details;
+
+          if (paymentMethodDetails?.card) {
+            await this.prisma.payment.updateMany({
+              where: { processorId },
+              data: {
+                cardType: String(paymentMethodDetails.card.brand),
+                last4: String(paymentMethodDetails.card.last4),
+                status: 'captured',
+              },
+            });
+
+            this.logger.log(
+              `Updated payment record with card details: ${paymentMethodDetails.card.brand} ****${paymentMethodDetails.card.last4}`,
+            );
+          }
         }
+      } catch (retrieveError) {
+        // Log but don't fail the capture if we can't get card details
+        this.logger.warn(
+          `Could not retrieve card details for payment ${paymentId}: ${retrieveError instanceof Error ? retrieveError.message : 'Unknown error'}`,
+        );
       }
     } catch (error) {
       const errorMessage =

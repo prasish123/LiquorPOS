@@ -1,171 +1,444 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InventoryService } from '../../inventory/inventory.service';
 import { OrdersService } from '../../orders/orders.service';
 import { ProductsService } from '../../products/products.service';
-// @ts-expect-error - fast-xml-parser does not have types
-import { XMLParser } from 'fast-xml-parser';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { LoggerService } from '../../common/logger.service';
+import {
+  ConexxusHttpClient,
+  ConexxusItem,
+  ConexxusSalesData,
+} from './conexxus-http.client';
 
-interface NAXMLItem {
-  ItemCode?: {
-    POSCode?: string | number;
-  };
-  ITTData?: {
-    RegularSellPrice?: string | number;
-    Description?: string;
-    MerchandiseCode?: string | number;
-  };
+export interface SyncMetrics {
+  startTime: Date;
+  endTime?: Date;
+  duration?: number;
+  itemsProcessed: number;
+  itemsSucceeded: number;
+  itemsFailed: number;
+  errors: Array<{ item?: string; error: string }>;
 }
 
-interface NAXMLMaintenance {
-  ItemMaintenance?: {
-    ITTDetail?: NAXMLItem | NAXMLItem[];
-  };
+export interface HealthStatus {
+  isHealthy: boolean;
+  lastSyncTime?: Date;
+  lastSyncStatus?: 'success' | 'partial' | 'failed';
+  lastError?: string;
+  apiConnection: boolean;
 }
 
-interface NAXMLResult {
-  'NAXML-MaintenanceRequest'?: NAXMLMaintenance;
-}
-
+/**
+ * Conexxus Integration Service
+ * Handles synchronization with Conexxus back-office system via REST API
+ *
+ * Features:
+ * - REST API integration (replaces file-based)
+ * - Automatic retries with exponential backoff
+ * - Comprehensive error handling
+ * - Health monitoring
+ * - Metrics tracking
+ */
 @Injectable()
 export class ConexxusService {
-  private readonly logger = new Logger(ConexxusService.name);
-  private readonly samplePath =
-    process.env.CONEXXUS_SAMPLE_PATH ||
-    path.join(process.cwd(), 'sample-files');
+  private readonly logger = new LoggerService('ConexxusService');
+  private readonly httpClient: ConexxusHttpClient | null;
+  private readonly isEnabled: boolean;
+
+  // Health tracking
+  private lastSyncTime?: Date;
+  private lastSyncStatus?: 'success' | 'partial' | 'failed';
+  private lastError?: string;
+  private syncMetrics: SyncMetrics[] = [];
+  private readonly maxMetricsHistory = 100;
 
   constructor(
     private inventoryService: InventoryService,
     private ordersService: OrdersService,
     private productsService: ProductsService,
-  ) {}
-
-  /**
-   * Sync inventory from Conexxus back-office system (ItemMaintenance.xml)
-   * Runs every hour
-   */
-  @Cron(CronExpression.EVERY_HOUR)
-  async syncInventory() {
-    this.logger.log(
-      'Starting scheduled Conexxus inventory sync from ItemMaintenance.xml...',
+  ) {
+    // Check if Conexxus is configured
+    this.isEnabled = !!(
+      process.env.CONEXXUS_API_URL && process.env.CONEXXUS_API_KEY
     );
 
-    try {
-      const filePath = path.join(this.samplePath, 'ItemMaintenance.xml');
-
-      // Check if file exists
-      try {
-        await fs.access(filePath);
-      } catch {
-        this.logger.warn(`Sample file not found at ${filePath}`);
-        return;
-      }
-
-      const data = await fs.readFile(filePath, 'utf-8');
-
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_',
-      }) as { parse: (data: string) => NAXMLResult };
-      const result = parser.parse(data);
-
-      const maintenance = result['NAXML-MaintenanceRequest'];
-      if (!maintenance || !maintenance['ItemMaintenance']) {
-        this.logger.warn('Invalid NAXML format');
-        return;
-      }
-
-      const items = maintenance['ItemMaintenance']['ITTDetail'];
-
-      if (!items) {
-        this.logger.warn('No items found in ItemMaintenance');
-        return;
-      }
-
-      // Ensure array
-      const itemsArray: NAXMLItem[] = Array.isArray(items) ? items : [items];
-
-      this.logger.log(`Found ${itemsArray.length} items to sync...`);
-      let updatedCount = 0;
-
-      for (const item of itemsArray) {
-        try {
-          // Extract fields safely
-          // XML parser might return numbers for POSCode if they look like numbers
-          const sku = item.ItemCode?.POSCode?.toString();
-          // ITTData might be nested
-          const detail = item.ITTData;
-
-          if (!sku || !detail) continue;
-
-          const priceValue = detail.RegularSellPrice;
-          const price =
-            typeof priceValue === 'number'
-              ? priceValue
-              : parseFloat(String(priceValue || '0'));
-          const name = detail.Description;
-          const catCode = detail.MerchandiseCode;
-
-          if (!name) continue;
-
-          // Upsert Product - MUST AWAIT
-          try {
-            const product = await this.productsService.findBySku(sku);
-            // Update
-            if (product) {
-              await this.productsService.update(product.id, {
-                name: name,
-                basePrice: !isNaN(price) ? price : product.basePrice,
-                category: `Conexxus-${String(catCode)}`,
-              });
-            }
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          } catch (_err) {
-            // NotFoundException -> Create
-            await this.productsService.create({
-              sku,
-              name,
-              basePrice: !isNaN(price) ? price : 0,
-              category: `Conexxus-${String(catCode)}`,
-              description: 'Imported from Conexxus NAXML',
-              cost: 0,
-              trackInventory: true,
-              ageRestricted: false, // Default
-            });
-          }
-          updatedCount++;
-        } catch (err) {
-          const errorMessage =
-            err instanceof Error ? err.message : 'Unknown error';
-          this.logger.warn(`Skipping item: ${errorMessage}`);
-        }
-      }
-
-      this.logger.log(`Conexxus Sync Complete. IDs Processed: ${updatedCount}`);
-    } catch (error) {
-      this.logger.error('Conexxus inventory sync failed:', error);
+    if (this.isEnabled) {
+      this.httpClient = new ConexxusHttpClient();
+      this.logger.log('Conexxus service initialized with HTTP client');
+    } else {
+      this.httpClient = null;
+      this.logger.warn(
+        'Conexxus integration disabled: API URL or API Key not configured',
+      );
     }
   }
 
   /**
-   * Push daily sales to Conexxus
+   * Sync inventory from Conexxus REST API
+   * Runs every hour
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async syncInventory(): Promise<SyncMetrics> {
+    const metrics: SyncMetrics = {
+      startTime: new Date(),
+      itemsProcessed: 0,
+      itemsSucceeded: 0,
+      itemsFailed: 0,
+      errors: [],
+    };
+
+    // Skip if Conexxus is not enabled
+    if (!this.isEnabled || !this.httpClient) {
+      this.logger.debug('Conexxus sync skipped: integration not enabled');
+      metrics.endTime = new Date();
+      metrics.duration = 0;
+      return metrics;
+    }
+
+    this.logger.log('Starting scheduled Conexxus inventory sync via REST API');
+
+    try {
+      // Fetch items from Conexxus API
+      const items = await this.httpClient.fetchInventoryItems();
+
+      if (!items || items.length === 0) {
+        this.logger.warn('No items returned from Conexxus API');
+        this.updateSyncStatus('success', metrics);
+        return metrics;
+      }
+
+      this.logger.log(`Received ${items.length} items from Conexxus API`);
+      metrics.itemsProcessed = items.length;
+
+      // Process each item
+      for (const item of items) {
+        try {
+          await this.processInventoryItem(item);
+          metrics.itemsSucceeded++;
+        } catch (error) {
+          metrics.itemsFailed++;
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          metrics.errors.push({
+            item: item.sku,
+            error: errorMessage,
+          });
+
+          this.logger.warn(`Failed to process item ${item.sku}`, {
+            sku: item.sku,
+            error: errorMessage,
+          });
+        }
+      }
+
+      // Determine sync status
+      const status =
+        metrics.itemsFailed === 0
+          ? 'success'
+          : metrics.itemsSucceeded > 0
+            ? 'partial'
+            : 'failed';
+
+      this.updateSyncStatus(status, metrics);
+
+      this.logger.log('Conexxus inventory sync completed', {
+        processed: metrics.itemsProcessed,
+        succeeded: metrics.itemsSucceeded,
+        failed: metrics.itemsFailed,
+        status,
+      });
+
+      return metrics;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const stack = error instanceof Error ? error.stack : undefined;
+
+      metrics.errors.push({
+        error: `Sync failed: ${errorMessage}`,
+      });
+
+      this.updateSyncStatus('failed', metrics, errorMessage);
+
+      this.logger.error('Conexxus inventory sync failed', stack, {
+        error: errorMessage,
+        processed: metrics.itemsProcessed,
+        succeeded: metrics.itemsSucceeded,
+        failed: metrics.itemsFailed,
+      });
+
+      throw error;
+    } finally {
+      metrics.endTime = new Date();
+      metrics.duration =
+        metrics.endTime.getTime() - metrics.startTime.getTime();
+      this.addMetrics(metrics);
+    }
+  }
+
+  /**
+   * Process a single inventory item
+   */
+  private async processInventoryItem(item: ConexxusItem): Promise<void> {
+    // Validate item data
+    if (!item.sku) {
+      throw new Error('Item missing SKU');
+    }
+
+    if (!item.name) {
+      throw new Error('Item missing name');
+    }
+
+    if (typeof item.price !== 'number' || item.price < 0) {
+      throw new Error('Item has invalid price');
+    }
+
+    try {
+      // Try to find existing product
+      const existingProduct = await this.productsService.findBySku(item.sku);
+
+      // Update existing product
+      await this.productsService.update(existingProduct.id, {
+        name: item.name,
+        basePrice: item.price,
+        category: item.category || existingProduct.category,
+        description:
+          item.description || existingProduct.description || undefined,
+      });
+
+      this.logger.debug(`Updated product ${item.sku}`, {
+        sku: item.sku,
+        name: item.name,
+        price: item.price,
+      });
+    } catch (error) {
+      // Product not found, create new one
+      if (error instanceof Error && error.message.includes('not found')) {
+        await this.productsService.create({
+          sku: item.sku,
+          name: item.name,
+          basePrice: item.price,
+          category: item.category || 'Conexxus',
+          description: item.description || 'Imported from Conexxus',
+          cost: item.price * 0.7, // Estimate 30% margin
+          trackInventory: true,
+          ageRestricted: false,
+        });
+
+        this.logger.debug(`Created new product ${item.sku}`, {
+          sku: item.sku,
+          name: item.name,
+          price: item.price,
+        });
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Push daily sales to Conexxus REST API
    * Runs daily at 11:30 PM
    */
   @Cron('0 30 23 * * *')
-  async pushSales(date: Date = new Date()) {
-    this.logger.log('Starting scheduled daily sales push to Conexxus...');
+  async pushSales(date: Date = new Date()): Promise<void> {
+    // Skip if Conexxus is not enabled
+    if (!this.isEnabled || !this.httpClient) {
+      this.logger.debug('Conexxus sales push skipped: integration not enabled');
+      return;
+    }
+
+    this.logger.log(
+      `Starting scheduled daily sales push to Conexxus for ${date.toDateString()}`,
+    );
 
     try {
-      // Real implementation would generate NAXML-POSJournal
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _sales = await this.ordersService.getDailySummary(date);
-      this.logger.log(
-        `Generated sales report for ${date.toDateString()}. (Mock Push to ${process.env.CONEXXUS_API_URL || 'Conexxus'})`,
-      );
+      // Get daily sales summary
+      const salesSummary = await this.ordersService.getDailySummary(date);
+
+      if (!salesSummary || salesSummary.totalOrders === 0) {
+        this.logger.log('No sales data to push for this date');
+        return;
+      }
+
+      // Transform to Conexxus format
+      const salesData: ConexxusSalesData = {
+        date: date.toISOString().split('T')[0],
+        locationId: process.env.LOCATION_ID || 'default',
+        transactions: [], // Summary data, not individual transactions
+        summary: {
+          totalOrders: salesSummary.totalOrders,
+          totalRevenue: salesSummary.totalRevenue,
+          totalTax: salesSummary.totalTax,
+          totalDiscount: salesSummary.totalDiscount,
+          averageOrderValue: salesSummary.averageOrderValue,
+          itemsSold: salesSummary.itemsSold,
+        },
+      };
+
+      // Push to Conexxus API
+      await this.httpClient.pushSalesData(salesData);
+
+      this.logger.log('Successfully pushed sales data to Conexxus', {
+        date: salesData.date,
+        transactionCount: salesData.transactions.length,
+      });
     } catch (error) {
-      this.logger.error('Conexxus sales push failed:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const stack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error('Failed to push sales data to Conexxus', stack, {
+        date: date.toDateString(),
+        error: errorMessage,
+      });
+
+      throw error;
     }
+  }
+
+  /**
+   * Manual sync trigger (for testing or on-demand sync)
+   */
+  async triggerManualSync(): Promise<SyncMetrics> {
+    this.logger.log('Manual inventory sync triggered');
+    return await this.syncInventory();
+  }
+
+  /**
+   * Test connection to Conexxus API
+   */
+  async testConnection(): Promise<{
+    success: boolean;
+    message: string;
+    latency?: number;
+  }> {
+    // Check if enabled
+    if (!this.isEnabled || !this.httpClient) {
+      return {
+        success: false,
+        message: 'Conexxus integration not enabled: API URL or API Key not configured',
+      };
+    }
+
+    this.logger.log('Testing connection to Conexxus API');
+
+    try {
+      const result = await this.httpClient.testConnection();
+
+      this.logger.log('Connection test completed', {
+        success: result.success,
+        message: result.message,
+        latency: result.latency,
+      });
+
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      this.logger.error('Connection test failed', undefined, {
+        error: errorMessage,
+      });
+
+      return {
+        success: false,
+        message: `Connection test failed: ${errorMessage}`,
+      };
+    }
+  }
+
+  /**
+   * Get health status of Conexxus integration
+   */
+  async getHealthStatus(): Promise<HealthStatus> {
+    // If not enabled, return disabled status
+    if (!this.isEnabled || !this.httpClient) {
+      return {
+        isHealthy: true, // Not unhealthy, just disabled
+        lastSyncTime: this.lastSyncTime,
+        lastSyncStatus: this.lastSyncStatus,
+        lastError: 'Integration not enabled',
+        apiConnection: false,
+      };
+    }
+
+    const apiConnection = await this.httpClient.healthCheck();
+
+    return {
+      isHealthy:
+        apiConnection &&
+        (!this.lastSyncStatus || this.lastSyncStatus !== 'failed'),
+      lastSyncTime: this.lastSyncTime,
+      lastSyncStatus: this.lastSyncStatus,
+      lastError: this.lastError,
+      apiConnection,
+    };
+  }
+
+  /**
+   * Get sync metrics history
+   */
+  getSyncMetrics(limit: number = 10): SyncMetrics[] {
+    return this.syncMetrics.slice(-limit);
+  }
+
+  /**
+   * Get latest sync metrics
+   */
+  getLatestSyncMetrics(): SyncMetrics | undefined {
+    return this.syncMetrics[this.syncMetrics.length - 1];
+  }
+
+  /**
+   * Update sync status tracking
+   */
+  private updateSyncStatus(
+    status: 'success' | 'partial' | 'failed',
+    metrics: SyncMetrics,
+    error?: string,
+  ): void {
+    this.lastSyncTime = new Date();
+    this.lastSyncStatus = status;
+    this.lastError = error;
+
+    if (status === 'failed') {
+      this.logger.error('Sync failed', undefined, {
+        error,
+        metrics,
+      });
+    } else if (status === 'partial') {
+      this.logger.warn('Sync completed with errors', {
+        succeeded: metrics.itemsSucceeded,
+        failed: metrics.itemsFailed,
+      });
+    } else {
+      this.logger.log('Sync completed successfully', {
+        itemsProcessed: metrics.itemsProcessed,
+      });
+    }
+  }
+
+  /**
+   * Add metrics to history
+   */
+  private addMetrics(metrics: SyncMetrics): void {
+    this.syncMetrics.push(metrics);
+
+    // Keep only recent metrics
+    if (this.syncMetrics.length > this.maxMetricsHistory) {
+      this.syncMetrics = this.syncMetrics.slice(-this.maxMetricsHistory);
+    }
+  }
+
+  /**
+   * Clear metrics history (for testing)
+   */
+  clearMetrics(): void {
+    this.syncMetrics = [];
+    this.lastSyncTime = undefined;
+    this.lastSyncStatus = undefined;
+    this.lastError = undefined;
   }
 }

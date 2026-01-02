@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AIModule } from './ai/ai.module';
@@ -16,6 +16,9 @@ import { ConexxusModule } from './integrations/conexxus/conexxus.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
+import { HealthModule } from './health/health.module';
+import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
+import { AppExceptionFilter } from './common/filters/app-exception.filter';
 
 @Module({
   imports: [
@@ -24,12 +27,29 @@ import { CommonModule } from './common/common.module';
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
+        name: 'default',
         ttl: 60000, // 60 seconds
-        limit: 10, // 10 requests per ttl
+        limit: 100, // 100 requests per minute - reasonable for POS operations
+      },
+      {
+        name: 'strict',
+        ttl: 60000, // 60 seconds
+        limit: 5, // 5 requests per minute - for sensitive operations (login)
+      },
+      {
+        name: 'orders',
+        ttl: 60000, // 60 seconds
+        limit: 30, // 30 orders per minute per terminal
+      },
+      {
+        name: 'inventory',
+        ttl: 60000, // 60 seconds
+        limit: 50, // 50 inventory operations per minute
       },
     ]),
     CommonModule,
     RedisModule,
+    HealthModule,
     AIModule,
     ProductsModule,
     OrdersModule,
@@ -46,6 +66,14 @@ import { CommonModule } from './common/common.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    {
+      provide: APP_FILTER,
+      useClass: AppExceptionFilter,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

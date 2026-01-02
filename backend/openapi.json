@@ -1,0 +1,215 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "POS-Omni Liquor POS API",
+    "description": "REST API for POS-Omni liquor store point-of-sale system. Supports order processing, inventory management, customer management, and external integrations.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "POS-Omni Support",
+      "url": "https://github.com/pos-omni/liquor-pos",
+      "email": "support@pos-omni.example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development"
+    },
+    {
+      "url": "https://api.pos-omni.example.com",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication and authorization"
+    },
+    {
+      "name": "orders",
+      "description": "Order processing and management"
+    },
+    {
+      "name": "products",
+      "description": "Product catalog and search"
+    },
+    {
+      "name": "inventory",
+      "description": "Inventory tracking and management"
+    },
+    {
+      "name": "customers",
+      "description": "Customer management"
+    },
+    {
+      "name": "health",
+      "description": "Health check endpoints"
+    },
+    {
+      "name": "integrations",
+      "description": "External system integrations"
+    },
+    {
+      "name": "locations",
+      "description": "Store location management"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "JWT": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Enter JWT token"
+      },
+      "csrf-token": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "csrf-token",
+        "description": "CSRF protection token (automatically set)"
+      },
+      "CSRF": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-csrf-token",
+        "description": "CSRF token from cookie (required for POST/PUT/PATCH/DELETE)"
+      }
+    }
+  },
+  "paths": {
+    "/auth/csrf-token": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Get CSRF token",
+        "description": "Retrieve the CSRF token for use in state-changing requests. The token is also set as a cookie.",
+        "responses": {
+          "200": {
+            "description": "CSRF token retrieved successfully"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "User login",
+        "description": "Authenticate user with username and password. Returns user info and sets JWT in HttpOnly cookie. Rate limited to 5 attempts per minute.",
+        "security": [{ "CSRF": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "example": "john.doe" },
+                  "password": { "type": "string", "example": "SecurePassword123!" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful" },
+          "401": { "description": "Invalid credentials" },
+          "403": { "description": "Invalid CSRF token" },
+          "429": { "description": "Too many login attempts" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "User logout",
+        "description": "Logout the current user, revoke JWT token, and clear authentication cookie.",
+        "security": [{ "JWT": [] }, { "CSRF": [] }],
+        "responses": {
+          "200": { "description": "Logout successful" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Invalid CSRF token" }
+        }
+      }
+    },
+    "/auth/validate": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Validate JWT token",
+        "description": "Validate the current JWT token and return user information.",
+        "security": [{ "JWT": [] }],
+        "responses": {
+          "200": { "description": "Token is valid" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": ["orders"],
+        "summary": "Create a new order",
+        "description": "Process a new order with items, payment, and customer information. Supports idempotency via idempotencyKey.",
+        "security": [{ "JWT": [] }, { "CSRF": [] }],
+        "responses": {
+          "201": { "description": "Order created successfully" },
+          "400": { "description": "Invalid input data" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Invalid CSRF token" },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      },
+      "get": {
+        "tags": ["orders"],
+        "summary": "List all orders",
+        "description": "Retrieve a paginated list of orders with optional location filtering",
+        "security": [{ "JWT": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "locationId", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List retrieved successfully" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Comprehensive health check",
+        "description": "Check health of all system dependencies including database, cache, integrations, and system resources.",
+        "responses": {
+          "200": { "description": "All systems healthy" },
+          "503": { "description": "One or more systems unhealthy" }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Liveness probe",
+        "description": "Check if the application is alive and running. Used for container orchestration restart decisions.",
+        "responses": {
+          "200": { "description": "Application is alive" },
+          "503": { "description": "Application is not healthy" }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Readiness probe",
+        "description": "Check if the application is ready to serve traffic. Verifies critical dependencies are available.",
+        "responses": {
+          "200": { "description": "Application is ready" },
+          "503": { "description": "Application is not ready" }
+        }
+      }
+    }
+  }
+}
+

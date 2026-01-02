@@ -6,7 +6,8 @@ This application uses **centralized environment validation** that runs at startu
 
 ✅ **New in v2.0:** Automatic validation at startup  
 ✅ **New in v2.0:** Auto-generated JWT secrets in development  
-✅ **New in v2.0:** Comprehensive error messages with fix instructions
+✅ **New in v2.0:** Comprehensive error messages with fix instructions  
+✅ **New in v3.0:** Structured logging with Winston and correlation IDs
 
 ## Required Environment Variables
 
@@ -32,9 +33,11 @@ AUDIT_LOG_ENCRYPTION_KEY=qVvLhfcDvgh42nScKjTaNQl1mcjXYlFE8apAvBVaII0=
 ```
 
 **⚠️ CRITICAL**: 
-- Backup this key securely (password manager, secrets vault)
-- Losing this key means audit logs cannot be decrypted
+- **Backup this key securely** (password manager, secrets vault, key management service)
+- **Losing this key means permanent data loss** - audit logs cannot be decrypted
+- **7-year retention requirement** for liquor sales records (compliance)
 - Use different keys for dev/staging/production
+- **See `docs/ENCRYPTION_KEY_MANAGEMENT.md` for complete key management guide**
 
 ---
 
@@ -256,11 +259,78 @@ STRIPE_SECRET_KEY=sk_test_your_key
 
 1. **Never commit `.env` to git** (already in `.gitignore`)
 2. **Use different keys per environment** (dev/staging/prod)
-3. **Rotate encryption keys periodically** (requires data re-encryption)
-4. **Store production keys in secrets manager** (AWS Secrets Manager, Azure Key Vault)
-5. **Backup encryption key securely** (losing it = data loss)
+3. **Rotate encryption keys periodically** (annually recommended)
+   - See `docs/ENCRYPTION_KEY_MANAGEMENT.md` for rotation procedure
+   - Use `npm run rotate-key` script for automated re-encryption
+4. **Store production keys in secrets manager** (AWS Secrets Manager, Azure Key Vault, HashiCorp Vault)
+5. **Backup encryption key securely** (losing it = permanent data loss)
+   - Multiple backup locations recommended
+   - Test recovery procedure quarterly
 6. **Use strong JWT secrets** (32+ characters or base64-encoded 32 bytes)
 7. **Never use default secrets** (validation will reject them)
+8. **Document key operations** (generation, rotation, recovery)
+9. **Restrict key access** (principle of least privilege)
+10. **Test disaster recovery** (key loss scenario)
+
+---
+
+## Logging Configuration (Optional)
+
+### LOG_LEVEL
+**Purpose**: Control logging verbosity  
+**Options**: `debug`, `info`, `warn`, `error`  
+**Default**: `info`
+
+**Development**:
+```bash
+LOG_LEVEL=debug
+```
+
+**Production**:
+```bash
+LOG_LEVEL=info  # or warn/error for less verbose logs
+```
+
+### LOG_DIR
+**Purpose**: Directory for log files (production only)  
+**Default**: `logs`
+
+**Production**:
+```bash
+LOG_DIR=/var/log/liquor-pos
+```
+
+**Features**:
+- ✅ Structured JSON logging in production
+- ✅ Human-readable console logs in development
+- ✅ Automatic log rotation (daily, max 20MB per file)
+- ✅ Separate error logs (30-day retention)
+- ✅ Combined logs (14-day retention)
+- ✅ Request correlation IDs for tracing
+- ✅ Contextual metadata (user, IP, duration, etc.)
+
+---
+
+## What's New in v3.0
+
+### ✅ Structured Logging with Winston
+- JSON logs for production (easy aggregation)
+- Human-readable logs for development
+- Automatic log rotation with daily files
+- Separate error and combined log files
+- Log level filtering (debug/info/warn/error)
+
+### ✅ Request Correlation IDs
+- Unique ID per request for tracing
+- Automatically included in all logs
+- Returned in `X-Correlation-Id` header
+- Supports distributed tracing
+
+### ✅ Contextual Metadata
+- Every log includes context (service name)
+- Request logs include: method, path, status, duration, user, IP
+- Error logs include stack traces
+- Structured metadata for easy filtering
 
 ---
 

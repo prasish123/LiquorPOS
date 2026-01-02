@@ -1,6 +1,13 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 
-const prisma = new PrismaClient();
+// Create Prisma adapter with database URL
+const adapter = new PrismaLibSql({
+    url: process.env.DATABASE_URL || 'file:./dev.db',
+});
+
+// Initialize Prisma with adapter
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log('🌱 Seeding database...');
@@ -16,6 +23,8 @@ async function main() {
             city: 'Miami',
             state: 'FL',
             zip: '33101',
+            taxRate: 0.07, // 7% Florida state tax
+            countyTaxRate: 0.015, // 1.5% Miami-Dade county tax
             licenseNumber: 'FL-LIQ-12345',
             licenseExpiry: new Date('2026-12-31'),
         },

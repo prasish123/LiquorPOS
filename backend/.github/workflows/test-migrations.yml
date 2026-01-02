@@ -1,0 +1,185 @@
+name: Test Database Migrations
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/prisma/**'
+      - 'backend/src/**'
+      - '.github/workflows/test-migrations.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/prisma/**'
+      - 'backend/src/**'
+
+jobs:
+  test-migrations:
+    name: Test Migrations
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: backend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Check migration files exist
+        run: |
+          if [ ! -d "prisma/migrations" ]; then
+            echo "❌ No migrations directory found"
+            exit 1
+          fi
+          
+          MIGRATION_COUNT=$(find prisma/migrations -name "migration.sql" | wc -l)
+          echo "✅ Found $MIGRATION_COUNT migration(s)"
+          
+          if [ $MIGRATION_COUNT -eq 0 ]; then
+            echo "❌ No migration files found"
+            exit 1
+          fi
+      
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      
+      - name: Check for schema drift
+        run: |
+          # Generate SQL from schema
+          npx prisma migrate diff \
+            --from-empty \
+            --to-schema prisma/schema.prisma \
+            --script > /tmp/schema.sql
+          
+          # Generate SQL from migrations
+          npx prisma migrate diff \
+            --from-empty \
+            --to-migrations prisma/migrations \
+            --script > /tmp/migrations.sql
+          
+          # Compare
+          if ! diff /tmp/schema.sql /tmp/migrations.sql > /dev/null; then
+            echo "❌ Schema drift detected!"
+            echo "Your schema.prisma doesn't match your migrations."
+            echo ""
+            echo "Differences:"
+            diff /tmp/schema.sql /tmp/migrations.sql || true
+            echo ""
+            echo "Run 'npx prisma migrate dev' to generate missing migration"
+            exit 1
+          fi
+          
+          echo "✅ No schema drift detected"
+      
+      - name: Test migrations on clean database
+        run: |
+          # Remove any existing test database
+          rm -f test.db test.db-journal
+          
+          # Set test database URL
+          export DATABASE_URL="file:./test.db"
+          
+          # Apply migrations
+          npx prisma migrate deploy
+          
+          # Verify migrations applied
+          if [ ! -f "test.db" ]; then
+            echo "❌ Database not created"
+            exit 1
+          fi
+          
+          echo "✅ Migrations applied successfully"
+      
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      
+      - name: Test database operations
+        run: |
+          export DATABASE_URL="file:./test.db"
+          
+          # Create test file
+          cat > test-db.ts << 'EOF'
+          import { PrismaClient } from '@prisma/client';
+          
+          const prisma = new PrismaClient();
+          
+          async function test() {
+            try {
+              // Test basic operations
+              const user = await prisma.user.create({
+                data: {
+                  username: 'ci_test_user',
+                  password: 'hashed',
+                  firstName: 'CI',
+                  lastName: 'Test',
+                },
+              });
+              console.log('✅ User created:', user.id);
+              
+              const location = await prisma.location.create({
+                data: {
+                  name: 'CI Test Store',
+                  address: '123 CI St',
+                  city: 'Test',
+                  state: 'FL',
+                  zip: '12345',
+                },
+              });
+              console.log('✅ Location created:', location.id);
+              
+              await prisma.$disconnect();
+              process.exit(0);
+            } catch (error) {
+              console.error('❌ Test failed:', error);
+              await prisma.$disconnect();
+              process.exit(1);
+            }
+          }
+          
+          test();
+          EOF
+          
+          # Run test
+          npx ts-node test-db.ts
+          
+          # Cleanup
+          rm test-db.ts test.db test.db-journal
+      
+      - name: Check migration lock file
+        run: |
+          if [ ! -f "prisma/migrations/migration_lock.toml" ]; then
+            echo "❌ migration_lock.toml not found"
+            echo "This file should be committed to Git"
+            exit 1
+          fi
+          
+          echo "✅ migration_lock.toml exists"
+      
+      - name: Summary
+        if: success()
+        run: |
+          echo "=============================="
+          echo "✅ All migration tests passed!"
+          echo "=============================="
+          echo ""
+          echo "Summary:"
+          MIGRATION_COUNT=$(find prisma/migrations -name "migration.sql" | wc -l)
+          echo "  - Migrations found: $MIGRATION_COUNT"
+          echo "  - Schema validated: ✓"
+          echo "  - Schema drift: None"
+          echo "  - Database operations: ✓"
+          echo "  - Migration lock: ✓"
+          echo ""
+          echo "Migrations are ready for deployment."
+

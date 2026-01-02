@@ -74,7 +74,10 @@ export class OrderOrchestrator {
           })),
         };
       } else {
-        context.pricing = await this.pricingAgent.calculate(dto.items);
+        context.pricing = await this.pricingAgent.calculate(
+          dto.items,
+          dto.locationId,
+        );
       }
 
       // Step 3: Compliance check (age verification)

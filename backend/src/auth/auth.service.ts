@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -12,6 +12,7 @@ import {
   ValidatedUser,
 } from './dto/auth.dto';
 import { User } from '@prisma/client';
+import { AuthenticationException, ErrorCode } from '../common/errors';
 
 type UserWithoutPassword = Omit<User, 'password'>;
 
@@ -42,7 +43,7 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<LoginResponse> {
     const user = await this.validateUser(loginDto.username, loginDto.password);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new AuthenticationException(ErrorCode.AUTH_INVALID_CREDENTIALS);
     }
 
     const jti = randomBytes(16).toString('hex');
