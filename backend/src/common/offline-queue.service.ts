@@ -382,4 +382,38 @@ export class OfflineQueueService implements OnModuleInit {
    */
   async retryFailed(): Promise<number> {
     const failedOps = await this.prisma.eventLog.findMany({
- 
+      where: {
+        eventType: {
+          startsWith: 'offline.queue.',
+        },
+        processed: true,
+      },
+    });
+
+    let retriedCount = 0;
+
+    for (const op of failedOps) {
+      const data = JSON.parse(op.payload);
+      if (data.status === 'failed' && data.attempts < data.maxAttempts) {
+        // Reset to pending for retry
+        data.status = 'pending';
+        data.error = undefined;
+
+        await this.prisma.eventLog.update({
+          where: { id: op.id },
+          data: {
+            payload: JSON.stringify(data),
+            processed: false,
+            processedAt: null,
+          },
+        });
+
+        retriedCount++;
+      }
+    }
+
+    this.logger.log(`Reset ${retriedCount} failed operations for retry`);
+    return retriedCount;
+  }
+}
+
