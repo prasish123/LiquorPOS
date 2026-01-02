@@ -22,10 +22,12 @@ import { CommonModule } from './common/common.module';
     ConfigModule.forRoot({ isGlobal: true }),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{
-      ttl: 60000, // 60 seconds
-      limit: 10, // 10 requests per ttl
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds
+        limit: 10, // 10 requests per ttl
+      },
+    ]),
     CommonModule,
     RedisModule,
     AIModule,
@@ -46,4 +48,4 @@ import { CommonModule } from './common/common.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

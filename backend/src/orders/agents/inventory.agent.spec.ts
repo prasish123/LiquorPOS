@@ -1,0 +1,563 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
+import { InventoryAgent } from './inventory.agent';
+import { PrismaService } from '../../prisma.service';
+import { OrderItemDto } from '../dto/order.dto';
+
+describe('InventoryAgent', () => {
+  let agent: InventoryAgent;
+  let prismaService: PrismaService;
+
+  const mockPrismaService = {
+    product: {
+      findUnique: jest.fn(),
+    },
+    inventory: {
+      update: jest.fn(),
+    },
+    $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        InventoryAgent,
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
+      ],
+    }).compile();
+
+    agent = module.get<InventoryAgent>(InventoryAgent);
+    prismaService = module.get<PrismaService>(PrismaService);
+
+    // Reset mocks
+    jest.clearAllMocks();
+  });
+
+  describe('checkAndReserve', () => {
+    const locationId = 'loc-001';
+    const items: OrderItemDto[] = [
+      {
+        sku: 'WINE-001',
+        quantity: 2,
+      },
+    ];
+
+    it('should successfully reserve inventory with row locking', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        name: 'Test Wine',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            quantity: 10,
+            reserved: 0,
+          },
+        ],
+      };
+
+      const mockLockedInventory = [
+        {
+          id: 'inv-001',
+          quantity: 10,
+          reserved: 0,
+        },
+      ];
+
+      // Mock transaction execution
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          // Create transaction context with mocked methods
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            inventory: {
+              update: jest.fn().mockResolvedValue({
+                id: 'inv-001',
+                reserved: 2,
+              }),
+            },
+            $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      const result = await agent.checkAndReserve(locationId, items);
+
+      expect(result).toHaveProperty('reservationId');
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual({
+        sku: 'WINE-001',
+        quantity: 2,
+        productId: 'prod-001',
+      });
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          isolationLevel: 'Serializable',
+          maxWait: 5000,
+          timeout: 10000,
+        }),
+      );
+    });
+
+    it('should throw error when product not found', async () => {
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(null),
+            },
+            $queryRaw: jest.fn(),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        'Product with SKU WINE-001 not found',
+      );
+    });
+
+    it('should throw error when insufficient inventory', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        name: 'Test Wine',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            quantity: 10,
+            reserved: 9, // Only 1 available
+          },
+        ],
+      };
+
+      const mockLockedInventory = [
+        {
+          id: 'inv-001',
+          quantity: 10,
+          reserved: 9, // Only 1 available, but requesting 2
+        },
+      ];
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        'Insufficient inventory',
+      );
+    });
+
+    it('should handle non-tracked inventory products', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        name: 'Test Wine',
+        trackInventory: false, // Not tracked
+        inventory: [],
+      };
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            $queryRaw: jest.fn(),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      const result = await agent.checkAndReserve(locationId, items);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toEqual({
+        sku: 'WINE-001',
+        quantity: 2,
+        productId: 'prod-001',
+      });
+    });
+
+    it('should throw error when inventory record not found', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        name: 'Test Wine',
+        trackInventory: true,
+        inventory: [], // No inventory record
+      };
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            $queryRaw: jest.fn(),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        'No inventory found',
+      );
+    });
+
+    it('should throw error when row lock fails', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        name: 'Test Wine',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            quantity: 10,
+            reserved: 0,
+          },
+        ],
+      };
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            $queryRaw: jest.fn().mockResolvedValue([]), // Empty result = lock failed
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
+        'Failed to lock inventory',
+      );
+    });
+
+    it('should reserve multiple items atomically', async () => {
+      const multipleItems: OrderItemDto[] = [
+        { sku: 'WINE-001', quantity: 2 },
+        { sku: 'BEER-001', quantity: 3 },
+      ];
+
+      const mockProducts = {
+        'WINE-001': {
+          id: 'prod-001',
+          sku: 'WINE-001',
+          name: 'Test Wine',
+          trackInventory: true,
+          inventory: [{ id: 'inv-001', quantity: 10, reserved: 0 }],
+        },
+        'BEER-001': {
+          id: 'prod-002',
+          sku: 'BEER-001',
+          name: 'Test Beer',
+          trackInventory: true,
+          inventory: [{ id: 'inv-002', quantity: 20, reserved: 0 }],
+        },
+      };
+
+      let callCount = 0;
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockImplementation(({ where }) => {
+                const product = mockProducts[where.sku as keyof typeof mockProducts];
+                return Promise.resolve(product);
+              }),
+            },
+            inventory: {
+              update: jest.fn().mockResolvedValue({}),
+            },
+            $queryRaw: jest.fn().mockImplementation(() => {
+              callCount++;
+              if (callCount === 1) {
+                return Promise.resolve([{ id: 'inv-001', quantity: 10, reserved: 0 }]);
+              }
+              return Promise.resolve([{ id: 'inv-002', quantity: 20, reserved: 0 }]);
+            }),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      const result = await agent.checkAndReserve(locationId, multipleItems);
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].sku).toBe('WINE-001');
+      expect(result.items[1].sku).toBe('BEER-001');
+    });
+  });
+
+  describe('release', () => {
+    const locationId = 'loc-001';
+    const reservation = {
+      reservationId: 'res-001',
+      items: [
+        {
+          sku: 'WINE-001',
+          quantity: 2,
+          productId: 'prod-001',
+        },
+      ],
+    };
+
+    it('should release reserved inventory with row locking', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            reserved: 5,
+          },
+        ],
+      };
+
+      const mockLockedInventory = [
+        {
+          id: 'inv-001',
+          reserved: 5,
+        },
+      ];
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            inventory: {
+              update: jest.fn().mockResolvedValue({
+                id: 'inv-001',
+                reserved: 3,
+              }),
+            },
+            $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await agent.release(reservation, locationId);
+
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          isolationLevel: 'Serializable',
+        }),
+      );
+    });
+
+    it('should not go below zero when releasing', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            reserved: 1, // Less than quantity being released
+          },
+        ],
+      };
+
+      const mockLockedInventory = [
+        {
+          id: 'inv-001',
+          reserved: 1,
+        },
+      ];
+
+      let capturedUpdate: { reserved: number } | null = null;
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            inventory: {
+              update: jest.fn().mockImplementation(({ data }) => {
+                capturedUpdate = data as { reserved: number };
+                return Promise.resolve({ id: 'inv-001', reserved: data.reserved });
+              }),
+            },
+            $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await agent.release(reservation, locationId);
+
+      expect(capturedUpdate).not.toBeNull();
+      expect(capturedUpdate?.reserved).toBe(0); // Should be 0, not negative
+    });
+  });
+
+  describe('commit', () => {
+    const locationId = 'loc-001';
+    const reservation = {
+      reservationId: 'res-001',
+      items: [
+        {
+          sku: 'WINE-001',
+          quantity: 2,
+          productId: 'prod-001',
+        },
+      ],
+    };
+
+    it('should commit reservation with row locking', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            quantity: 10,
+            reserved: 5,
+          },
+        ],
+      };
+
+      const mockLockedInventory = [
+        {
+          id: 'inv-001',
+          quantity: 10,
+          reserved: 5,
+        },
+      ];
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            inventory: {
+              update: jest.fn().mockResolvedValue({
+                id: 'inv-001',
+                quantity: 8,
+                reserved: 3,
+              }),
+            },
+            $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await agent.commit(reservation, locationId);
+
+      expect(mockPrismaService.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          isolationLevel: 'Serializable',
+        }),
+      );
+    });
+
+    it('should update both quantity and reserved atomically', async () => {
+      const mockProduct = {
+        id: 'prod-001',
+        sku: 'WINE-001',
+        trackInventory: true,
+        inventory: [
+          {
+            id: 'inv-001',
+            quantity: 10,
+            reserved: 2,
+          },
+        ],
+      };
+
+      const mockLockedInventory = [
+        {
+          id: 'inv-001',
+          quantity: 10,
+          reserved: 2,
+        },
+      ];
+
+      let capturedUpdate: { quantity: number; reserved: number } | null = null;
+
+      mockPrismaService.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockPrismaService) => Promise<void>) => {
+          const txContext = {
+            product: {
+              findUnique: jest.fn().mockResolvedValue(mockProduct),
+            },
+            inventory: {
+              update: jest.fn().mockImplementation(({ data }) => {
+                capturedUpdate = data as { quantity: number; reserved: number };
+                return Promise.resolve({
+                  id: 'inv-001',
+                  quantity: data.quantity,
+                  reserved: data.reserved,
+                });
+              }),
+            },
+            $queryRaw: jest.fn().mockResolvedValue(mockLockedInventory),
+          };
+
+          await callback(txContext as never);
+        },
+      );
+
+      await agent.commit(reservation, locationId);
+
+      expect(capturedUpdate).not.toBeNull();
+      expect(capturedUpdate?.quantity).toBe(8); // 10 - 2
+      expect(capturedUpdate?.reserved).toBe(0); // 2 - 2
+    });
+  });
+});
+

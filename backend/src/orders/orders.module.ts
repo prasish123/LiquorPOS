@@ -25,4 +25,4 @@ import { PrismaService } from '../prisma.service';
   controllers: [OrdersController],
   exports: [OrdersService],
 })
-export class OrdersModule { }
+export class OrdersModule {}

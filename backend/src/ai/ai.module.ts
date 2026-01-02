@@ -4,7 +4,7 @@ import { LocalAIService } from './local-ai.service';
 
 @Global()
 @Module({
-    providers: [OpenAIService, LocalAIService],
-    exports: [OpenAIService, LocalAIService],
+  providers: [OpenAIService, LocalAIService],
+  exports: [OpenAIService, LocalAIService],
 })
-export class AIModule { }
+export class AIModule {}

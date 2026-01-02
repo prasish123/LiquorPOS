@@ -1,16 +1,30 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { ConfigValidationService } from './common/config-validation.service';
 import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
 import { randomBytes } from 'crypto';
+import { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+
+  // CRITICAL: Validate environment variables BEFORE creating the app
+  // This ensures we fail fast if configuration is invalid
+  logger.log('Validating environment configuration...');
+  const configValidator = new ConfigValidationService();
+  const config = configValidator.validateAndThrow();
+  logger.log('Environment validation complete');
+
   // HTTPS configuration for production
-  const httpsOptions = process.env.SSL_KEY_PATH && process.env.SSL_CERT_PATH ? {
-    key: fs.readFileSync(process.env.SSL_KEY_PATH),
-    cert: fs.readFileSync(process.env.SSL_CERT_PATH),
-  } : undefined;
+  const httpsOptions =
+    config.SSL_KEY_PATH && config.SSL_CERT_PATH
+      ? {
+          key: fs.readFileSync(config.SSL_KEY_PATH),
+          cert: fs.readFileSync(config.SSL_CERT_PATH),
+        }
+      : undefined;
 
   const app = await NestFactory.create(AppModule, { httpsOptions });
 
@@ -18,18 +32,20 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Request logging middleware for audit trail
-  app.use((req: any, res: any, next: any) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     const { method, originalUrl, ip } = req;
+    const user =
+      (req as Request & { user?: { username?: string } }).user?.username ||
+      'anonymous';
 
     res.on('finish', () => {
       const duration = Date.now() - start;
       const { statusCode } = res;
-      const user = req.user?.username || 'anonymous';
 
       // Log format: [timestamp] METHOD /path STATUS duration user IP
       console.log(
-        `[${new Date().toISOString()}] ${method} ${originalUrl} ${statusCode} ${duration}ms ${user} ${ip}`
+        `[${new Date().toISOString()}] ${method} ${originalUrl} ${statusCode} ${duration}ms ${user} ${ip}`,
       );
 
       // For critical operations, log to audit table (orders, payments, inventory changes)
@@ -42,9 +58,10 @@ async function bootstrap() {
   });
 
   // CSRF Protection - Double Submit Cookie Pattern
-  app.use((req: any, res: any, next: any) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     // Set CSRF token cookie if not present
-    if (!req.cookies['csrf-token']) {
+    const cookies = req.cookies as Record<string, string> | undefined;
+    if (!cookies || !cookies['csrf-token']) {
       const token = randomBytes(32).toString('hex');
       res.cookie('csrf-token', token, {
         httpOnly: false, // Must be readable by JavaScript
@@ -56,12 +73,15 @@ async function bootstrap() {
     // Validate CSRF token on state-changing requests
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
       // Exempt auth endpoints (pre-authentication)
-      if (req.path.startsWith('/auth/login') || req.path.startsWith('/auth/csrf-token')) {
+      if (
+        req.path.startsWith('/auth/login') ||
+        req.path.startsWith('/auth/csrf-token')
+      ) {
         return next();
       }
 
-      const cookieToken = req.cookies['csrf-token'];
-      const headerToken = req.headers['x-csrf-token'];
+      const cookieToken = cookies?.['csrf-token'];
+      const headerToken = req.headers['x-csrf-token'] as string | undefined;
 
       if (!cookieToken || cookieToken !== headerToken) {
         return res.status(403).json({ message: 'Invalid CSRF token' });
@@ -82,19 +102,25 @@ async function bootstrap() {
     }),
   );
 
-  // Enable CORS with environment-based origins
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [];
-
-  if (allowedOrigins.length === 0) {
-    console.warn('⚠️  WARNING: ALLOWED_ORIGINS not configured. CORS will reject all cross-origin requests.');
-    console.warn('    Set ALLOWED_ORIGINS in .env (e.g., ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174)');
-  }
+  // Enable CORS with validated origins
+  const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map((origin) =>
+    origin.trim(),
+  );
 
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = config.PORT || 3000;
+  await app.listen(port);
+  logger.log(`🚀 Application is running on: http://localhost:${port}`);
 }
-bootstrap();
+
+bootstrap().catch((error: unknown) => {
+  const logger = new Logger('Bootstrap');
+  logger.error('❌ Application failed to start');
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  logger.error(errorMessage);
+  process.exit(1);
+});

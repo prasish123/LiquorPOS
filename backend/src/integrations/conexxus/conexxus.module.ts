@@ -6,8 +6,13 @@ import { OrdersModule } from '../../orders/orders.module';
 import { ProductsModule } from '../../products/products.module';
 
 @Module({
-    imports: [ScheduleModule.forRoot(), InventoryModule, OrdersModule, ProductsModule],
-    providers: [ConexxusService],
-    exports: [ConexxusService],
+  imports: [
+    ScheduleModule.forRoot(),
+    InventoryModule,
+    OrdersModule,
+    ProductsModule,
+  ],
+  providers: [ConexxusService],
+  exports: [ConexxusService],
 })
-export class ConexxusModule { }
+export class ConexxusModule {}
