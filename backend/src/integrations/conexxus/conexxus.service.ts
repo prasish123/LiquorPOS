@@ -4,11 +4,13 @@ import { InventoryService } from '../../inventory/inventory.service';
 import { OrdersService } from '../../orders/orders.service';
 import { ProductsService } from '../../products/products.service';
 import { LoggerService } from '../../common/logger.service';
+import { PrismaService } from '../../prisma.service';
 import {
   ConexxusHttpClient,
   ConexxusItem,
   ConexxusSalesData,
 } from './conexxus-http.client';
+import { CircuitState } from './circuit-breaker';
 
 export interface SyncMetrics {
   startTime: Date;
@@ -56,6 +58,7 @@ export class ConexxusService {
     private inventoryService: InventoryService,
     private ordersService: OrdersService,
     private productsService: ProductsService,
+    private prisma: PrismaService,
   ) {
     // Check if Conexxus is configured
     this.isEnabled = !!(
@@ -63,8 +66,21 @@ export class ConexxusService {
     );
 
     if (this.isEnabled) {
-      this.httpClient = new ConexxusHttpClient();
-      this.logger.log('Conexxus service initialized with HTTP client');
+      try {
+        this.httpClient = new ConexxusHttpClient(undefined, this.prisma);
+        this.logger.log(
+          'Conexxus service initialized with HTTP client and circuit breaker',
+        );
+      } catch (error) {
+        this.httpClient = null;
+        this.isEnabled = false;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Failed to initialize Conexxus HTTP client: ${errorMessage}. Integration disabled.`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     } else {
       this.httpClient = null;
       this.logger.warn(
@@ -318,7 +334,8 @@ export class ConexxusService {
     if (!this.isEnabled || !this.httpClient) {
       return {
         success: false,
-        message: 'Conexxus integration not enabled: API URL or API Key not configured',
+        message:
+          'Conexxus integration not enabled: API URL or API Key not configured',
       };
     }
 
@@ -364,6 +381,20 @@ export class ConexxusService {
       };
     }
 
+    // Check circuit breaker state
+    const circuitStats = this.httpClient.getCircuitBreakerStats();
+    const isCircuitOpen = circuitStats.state === CircuitState.OPEN;
+
+    if (isCircuitOpen) {
+      return {
+        isHealthy: false,
+        lastSyncTime: this.lastSyncTime,
+        lastSyncStatus: this.lastSyncStatus,
+        lastError: `Circuit breaker is OPEN (${circuitStats.failureCount} failures). Service unavailable.`,
+        apiConnection: false,
+      };
+    }
+
     const apiConnection = await this.httpClient.healthCheck();
 
     return {
@@ -375,6 +406,16 @@ export class ConexxusService {
       lastError: this.lastError,
       apiConnection,
     };
+  }
+
+  /**
+   * Get circuit breaker statistics
+   */
+  getCircuitBreakerStats() {
+    if (!this.httpClient) {
+      return null;
+    }
+    return this.httpClient.getCircuitBreakerStats();
   }
 
   /**

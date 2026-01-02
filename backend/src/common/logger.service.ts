@@ -162,6 +162,9 @@ export class LoggerService implements NestLoggerService {
       metadata.stack = trace;
     }
     this.logger.error(message, metadata);
+
+    // TODO: Integrate with Sentry for error tracking
+    // This will be automatically handled by the SentryService via the PerformanceInterceptor
   }
 
   /**

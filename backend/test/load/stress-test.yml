@@ -1,0 +1,104 @@
+# Artillery Stress Test Configuration
+# Tests system behavior under extreme load conditions
+
+config:
+  target: "http://localhost:3000"
+  
+  # Stress test phases - push system to limits
+  phases:
+    # Normal load baseline
+    - duration: 30
+      arrivalRate: 50
+      name: "Baseline"
+    
+    # Aggressive ramp-up
+    - duration: 60
+      arrivalRate: 50
+      rampTo: 300
+      name: "Stress ramp-up"
+    
+    # Extreme load - 300 orders/minute
+    - duration: 120
+      arrivalRate: 300
+      name: "Extreme load"
+    
+    # Push to breaking point - 500 orders/minute
+    - duration: 60
+      arrivalRate: 500
+      name: "Breaking point"
+    
+    # Recovery test
+    - duration: 60
+      arrivalRate: 100
+      name: "Recovery"
+
+  processor: "./helpers/auth-helper.js"
+  
+  http:
+    timeout: 60
+    pool: 100
+  
+  variables:
+    username: "admin"
+    password: "admin123"
+  
+  plugins:
+    expect:
+      outputFormat: "pretty"
+    metrics-by-endpoint:
+      stripQueryString: true
+
+  # More lenient thresholds for stress test
+  ensure:
+    maxErrorRate: 5 # Allow up to 5% errors under stress
+    p95: 5000 # 95th percentile < 5s
+    p99: 10000 # 99th percentile < 10s
+
+scenarios:
+  # Simplified checkout for stress testing
+  - name: "High-Volume Checkout"
+    weight: 90
+    flow:
+      - function: "beforeScenario"
+      - function: "generateIdempotencyKey"
+      - function: "generateOrderData"
+      
+      - post:
+          url: "/orders"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            x-csrf-token: "{{ csrfToken }}"
+            Content-Type: "application/json"
+          json:
+            locationId: "{{ orderData.locationId }}"
+            terminalId: "{{ orderData.terminalId }}"
+            items: "{{ orderData.items }}"
+            paymentMethod: "{{ orderData.paymentMethod }}"
+            channel: "{{ orderData.channel }}"
+            ageVerified: true
+            idScanned: true
+            idempotencyKey: "{{ orderData.idempotencyKey }}"
+          expect:
+            - statusCode: [201, 429] # Accept rate limiting
+
+  # Read operations
+  - name: "Read Operations"
+    weight: 10
+    flow:
+      - function: "beforeScenario"
+      
+      - get:
+          url: "/orders?page=1&limit=50"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: [200, 429]
+
+before:
+  flow:
+    - log: "Starting stress test - pushing system to limits..."
+
+after:
+  flow:
+    - log: "Stress test completed!"
+

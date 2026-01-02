@@ -17,6 +17,8 @@ import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
 import { HealthModule } from './health/health.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 import { AppExceptionFilter } from './common/filters/app-exception.filter';
 
@@ -50,6 +52,8 @@ import { AppExceptionFilter } from './common/filters/app-exception.filter';
     CommonModule,
     RedisModule,
     HealthModule,
+    WebhooksModule,
+    MonitoringModule,
     AIModule,
     ProductsModule,
     OrdersModule,

@@ -1,0 +1,100 @@
+# Artillery Spike Test Configuration
+# Tests system behavior under sudden traffic spikes
+
+config:
+  target: "http://localhost:3000"
+  
+  # Spike test phases - sudden bursts of traffic
+  phases:
+    # Normal baseline
+    - duration: 30
+      arrivalRate: 20
+      name: "Normal baseline"
+    
+    # SPIKE 1 - Sudden jump to 200/min
+    - duration: 30
+      arrivalRate: 200
+      name: "Spike 1"
+    
+    # Return to normal
+    - duration: 30
+      arrivalRate: 20
+      name: "Recovery 1"
+    
+    # SPIKE 2 - Even bigger spike to 400/min
+    - duration: 30
+      arrivalRate: 400
+      name: "Spike 2"
+    
+    # Return to normal
+    - duration: 30
+      arrivalRate: 20
+      name: "Recovery 2"
+    
+    # SPIKE 3 - Maximum spike to 600/min
+    - duration: 20
+      arrivalRate: 600
+      name: "Spike 3 - Maximum"
+    
+    # Final recovery
+    - duration: 40
+      arrivalRate: 20
+      name: "Final recovery"
+
+  processor: "./helpers/auth-helper.js"
+  
+  http:
+    timeout: 45
+    pool: 150
+  
+  variables:
+    username: "admin"
+    password: "admin123"
+  
+  plugins:
+    expect:
+      outputFormat: "pretty"
+    metrics-by-endpoint:
+      stripQueryString: true
+
+  # Spike test thresholds
+  ensure:
+    maxErrorRate: 3
+    p95: 3000
+    p99: 8000
+
+scenarios:
+  # Fast checkout for spike testing
+  - name: "Spike Checkout"
+    weight: 100
+    flow:
+      - function: "beforeScenario"
+      - function: "generateIdempotencyKey"
+      - function: "generateOrderData"
+      
+      - post:
+          url: "/orders"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            x-csrf-token: "{{ csrfToken }}"
+            Content-Type: "application/json"
+          json:
+            locationId: "{{ orderData.locationId }}"
+            terminalId: "{{ orderData.terminalId }}"
+            items: "{{ orderData.items }}"
+            paymentMethod: "{{ orderData.paymentMethod }}"
+            channel: "{{ orderData.channel }}"
+            ageVerified: true
+            idScanned: true
+            idempotencyKey: "{{ orderData.idempotencyKey }}"
+          expect:
+            - statusCode: [201, 429] # Accept rate limiting during spikes
+
+before:
+  flow:
+    - log: "Starting spike test - testing sudden traffic bursts..."
+
+after:
+  flow:
+    - log: "Spike test completed!"
+

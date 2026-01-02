@@ -1,0 +1,8 @@
+# Artillery test results
+results/*.json
+results/*.html
+results/*.xml
+
+# Keep the directory
+!results/.gitkeep
+

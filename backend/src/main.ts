@@ -6,8 +6,10 @@ import { ConfigValidationService } from './common/config-validation.service';
 import { LoggerService } from './common/logger.service';
 import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { randomBytes } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
+import * as bodyParser from 'body-parser';
 
 async function bootstrap() {
   const logger = new LoggerService('Bootstrap');
@@ -28,10 +30,51 @@ async function bootstrap() {
         }
       : undefined;
 
-  const app = await NestFactory.create(AppModule, { httpsOptions });
+  const app = await NestFactory.create(AppModule, {
+    httpsOptions,
+    rawBody: true, // Enable raw body for webhook signature verification
+  });
+
+  // CRITICAL: Raw body parser for Stripe webhooks
+  // Must be registered BEFORE json parser to preserve raw body for signature verification
+  app.use('/webhooks/stripe', bodyParser.raw({ type: 'application/json' }));
 
   // Enable cookie parser
   app.use(cookieParser());
+
+  // Security headers middleware (helmet)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for Swagger UI
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000, // 1 year in seconds
+        includeSubDomains: true,
+        preload: true,
+      },
+      frameguard: {
+        action: 'deny', // Prevent clickjacking
+      },
+      noSniff: true, // Prevent MIME type sniffing
+      xssFilter: true, // Enable XSS filter
+      referrerPolicy: {
+        policy: 'strict-origin-when-cross-origin',
+      },
+    }),
+  );
+
+  logger.log('Security headers configured (helmet)');
 
   // Request logging middleware for audit trail
   const requestLogger = new LoggerService('HTTP');
@@ -79,6 +122,11 @@ async function bootstrap() {
 
   // CSRF Protection - Double Submit Cookie Pattern
   app.use((req: Request, res: Response, next: NextFunction) => {
+    // Skip CSRF for webhooks (they use signature verification instead)
+    if (req.path.startsWith('/webhooks/')) {
+      return next();
+    }
+
     // Set CSRF token cookie if not present
     const cookies = req.cookies as Record<string, string> | undefined;
     if (!cookies || !cookies['csrf-token']) {
@@ -152,6 +200,7 @@ async function bootstrap() {
     .addTag('products', 'Product catalog and search')
     .addTag('inventory', 'Inventory tracking and management')
     .addTag('customers', 'Customer management')
+    .addTag('webhooks', 'Webhook endpoints for external integrations')
     .addTag('health', 'Health check endpoints')
     .addTag('integrations', 'External system integrations')
     .addBearerAuth(

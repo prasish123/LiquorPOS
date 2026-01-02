@@ -6,6 +6,7 @@ import { ConexxusHttpClient } from './conexxus-http.client';
 import { InventoryModule } from '../../inventory/inventory.module';
 import { OrdersModule } from '../../orders/orders.module';
 import { ProductsModule } from '../../products/products.module';
+import { PrismaService } from '../../prisma.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { ProductsModule } from '../../products/products.module';
     ProductsModule,
   ],
   controllers: [ConexxusController],
-  providers: [ConexxusService, ConexxusHttpClient],
+  providers: [ConexxusService, ConexxusHttpClient, PrismaService],
   exports: [ConexxusService],
 })
 export class ConexxusModule {}

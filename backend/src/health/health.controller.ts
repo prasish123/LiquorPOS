@@ -275,6 +275,84 @@ export class HealthController {
   }
 
   /**
+   * Connection pool metrics
+   * GET /health/pool
+   *
+   * Returns detailed connection pool metrics
+   * Useful for monitoring database connection usage
+   */
+  @Get('pool')
+  @ApiOperation({
+    summary: 'Connection pool metrics',
+    description:
+      'Get detailed connection pool metrics including active, idle, and total connections.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Connection pool metrics retrieved',
+    schema: {
+      example: {
+        status: 'healthy',
+        metrics: {
+          activeConnections: 3,
+          idleConnections: 7,
+          waitingRequests: 0,
+          totalConnections: 10,
+          poolSize: 20,
+        },
+        config: {
+          min: 2,
+          max: 20,
+          idleTimeout: 30000,
+          connectionTimeout: 10000,
+        },
+        utilization: {
+          percent: 50,
+          status: 'normal',
+        },
+        timestamp: '2026-01-02T12:00:00.000Z',
+      },
+    },
+  })
+  async getPoolMetrics() {
+    try {
+      const metrics = await this.prisma.getPoolMetrics();
+      const config = this.prisma.getPoolConfig();
+      const isHealthy = await this.prisma.isPoolHealthy();
+
+      const utilizationPercent =
+        (metrics.totalConnections / metrics.poolSize) * 100;
+
+      let utilizationStatus: 'normal' | 'warning' | 'critical';
+      if (utilizationPercent < 70) {
+        utilizationStatus = 'normal';
+      } else if (utilizationPercent < 90) {
+        utilizationStatus = 'warning';
+      } else {
+        utilizationStatus = 'critical';
+      }
+
+      return {
+        status: isHealthy ? 'healthy' : 'degraded',
+        metrics,
+        config,
+        utilization: {
+          percent: parseFloat(utilizationPercent.toFixed(1)),
+          status: utilizationStatus,
+        },
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message:
+          error instanceof Error ? error.message : 'Failed to get pool metrics',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
    * Detailed health status with metrics
    * GET /health/details
    *
@@ -305,12 +383,22 @@ export class HealthController {
           external: 1000000,
         },
         environment: 'production',
+        connectionPool: {
+          activeConnections: 3,
+          idleConnections: 7,
+          totalConnections: 10,
+          poolSize: 20,
+          utilization: 50,
+        },
       },
     },
   })
   async getDetails() {
     try {
       const healthResult = await this.check();
+      const poolMetrics = await this.prisma.getPoolMetrics();
+      const utilizationPercent =
+        (poolMetrics.totalConnections / poolMetrics.poolSize) * 100;
 
       return {
         status: healthResult.status,
@@ -321,6 +409,10 @@ export class HealthController {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         environment: process.env.NODE_ENV || 'development',
+        connectionPool: {
+          ...poolMetrics,
+          utilization: parseFloat(utilizationPercent.toFixed(1)),
+        },
       };
     } catch (error) {
       return {

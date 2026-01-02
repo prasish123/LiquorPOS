@@ -14,6 +14,10 @@ export interface EnvironmentConfig {
 
   // Database
   DATABASE_URL?: string;
+  DATABASE_POOL_MIN?: number;
+  DATABASE_POOL_MAX?: number;
+  DATABASE_POOL_IDLE_TIMEOUT?: number;
+  DATABASE_POOL_CONNECTION_TIMEOUT?: number;
 
   // Redis (optional)
   REDIS_URL?: string;
@@ -182,15 +186,92 @@ export class ConfigValidationService {
       config.STRIPE_SECRET_KEY = stripeKey;
     }
 
-    // 5. DATABASE_URL (Optional - defaults to SQLite)
+    // 5. DATABASE_URL (REQUIRED - PostgreSQL)
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
-      warnings.push(
-        'DATABASE_URL not set. Using default SQLite database (file:./dev.db). ' +
-          'For production, use PostgreSQL or MySQL.',
+      errors.push(
+        'DATABASE_URL is required. PostgreSQL connection string must be provided. ' +
+          'Example: postgresql://user:password@localhost:5432/liquor_pos ' +
+          'See docs/POSTGRESQL_MIGRATION_GUIDE.md for setup instructions.',
+      );
+    } else if (
+      !databaseUrl.startsWith('postgresql://') &&
+      !databaseUrl.startsWith('postgres://')
+    ) {
+      errors.push(
+        'DATABASE_URL must be a PostgreSQL connection string. ' +
+          'SQLite is no longer supported. ' +
+          'See docs/POSTGRESQL_MIGRATION_GUIDE.md for migration instructions.',
       );
     } else {
       config.DATABASE_URL = databaseUrl;
+    }
+
+    // 5a. Connection Pool Configuration (Optional)
+    const poolMin = process.env.DATABASE_POOL_MIN;
+    const poolMax = process.env.DATABASE_POOL_MAX;
+    const poolIdleTimeout = process.env.DATABASE_POOL_IDLE_TIMEOUT;
+    const poolConnectionTimeout = process.env.DATABASE_POOL_CONNECTION_TIMEOUT;
+
+    if (poolMin) {
+      const minValue = parseInt(poolMin, 10);
+      if (isNaN(minValue) || minValue < 1) {
+        warnings.push(
+          'DATABASE_POOL_MIN must be a positive integer. Using default.',
+        );
+      } else if (minValue > 50) {
+        warnings.push(
+          'DATABASE_POOL_MIN is very high (>50). This may consume excessive resources.',
+        );
+      } else {
+        config.DATABASE_POOL_MIN = minValue;
+      }
+    }
+
+    if (poolMax) {
+      const maxValue = parseInt(poolMax, 10);
+      if (isNaN(maxValue) || maxValue < 1) {
+        warnings.push(
+          'DATABASE_POOL_MAX must be a positive integer. Using default.',
+        );
+      } else if (maxValue > 100) {
+        warnings.push(
+          'DATABASE_POOL_MAX is very high (>100). This may overwhelm PostgreSQL.',
+        );
+      } else {
+        config.DATABASE_POOL_MAX = maxValue;
+      }
+    }
+
+    // Validate min <= max
+    if (config.DATABASE_POOL_MIN && config.DATABASE_POOL_MAX) {
+      if (config.DATABASE_POOL_MIN > config.DATABASE_POOL_MAX) {
+        errors.push(
+          'DATABASE_POOL_MIN cannot be greater than DATABASE_POOL_MAX.',
+        );
+      }
+    }
+
+    if (poolIdleTimeout) {
+      const timeoutValue = parseInt(poolIdleTimeout, 10);
+      if (isNaN(timeoutValue) || timeoutValue < 1000) {
+        warnings.push(
+          'DATABASE_POOL_IDLE_TIMEOUT must be at least 1000ms. Using default.',
+        );
+      } else {
+        config.DATABASE_POOL_IDLE_TIMEOUT = timeoutValue;
+      }
+    }
+
+    if (poolConnectionTimeout) {
+      const timeoutValue = parseInt(poolConnectionTimeout, 10);
+      if (isNaN(timeoutValue) || timeoutValue < 1000) {
+        warnings.push(
+          'DATABASE_POOL_CONNECTION_TIMEOUT must be at least 1000ms. Using default.',
+        );
+      } else {
+        config.DATABASE_POOL_CONNECTION_TIMEOUT = timeoutValue;
+      }
     }
 
     // 6. REDIS_URL (Optional)

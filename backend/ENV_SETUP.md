@@ -96,6 +96,104 @@ STRIPE_SECRET_KEY=sk_live_51ABC...
 
 ### Optional Variables
 
+#### Monitoring & APM (Application Performance Monitoring)
+
+##### Sentry Integration (Optional - Recommended for Production)
+**Purpose**: Error tracking and performance monitoring
+
+```bash
+# Sentry DSN (get from https://sentry.io)
+SENTRY_DSN=https://your-key@sentry.io/project-id
+
+# Environment (development, staging, production)
+SENTRY_ENVIRONMENT=production
+
+# Release version (optional - helps track which version has issues)
+SENTRY_RELEASE=1.0.0
+
+# Traces sample rate (0.0 to 1.0)
+# 1.0 = track 100% of requests (development)
+# 0.1 = track 10% of requests (production)
+SENTRY_TRACES_SAMPLE_RATE=1.0
+
+# Profiles sample rate (0.0 to 1.0)
+# 1.0 = profile 100% of requests (development)
+# 0.01 = profile 1% of requests (production)
+SENTRY_PROFILES_SAMPLE_RATE=1.0
+```
+
+**Features:**
+- ✅ Automatic error tracking with stack traces
+- ✅ Performance monitoring (request/query timing)
+- ✅ User context tracking
+- ✅ Breadcrumb tracking for debugging
+- ✅ Automatic sensitive data filtering
+- ✅ Release tracking
+- ✅ Profiling integration
+
+**⚠️ IMPORTANT:**
+- Sentry is optional - application works without it
+- Enables advanced error tracking and APM
+- Free tier available for small projects
+- Lower sample rates in production to reduce costs
+- See `docs/C009_QUICK_REFERENCE.md` for setup guide
+
+**Built-in Monitoring (Always Enabled):**
+- ✅ Performance tracking (requests, database queries)
+- ✅ Metrics collection (counters, gauges, histograms)
+- ✅ Slow request/query detection
+- ✅ Prometheus-compatible metrics export
+- ✅ API endpoints: `/monitoring/performance`, `/monitoring/metrics`
+
+---
+
+#### Redis Configuration
+
+##### Standalone Mode (Default)
+**Purpose**: Single Redis instance for caching
+
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password  # Optional
+```
+
+##### Sentinel Mode (High Availability - Recommended for Production)
+**Purpose**: Redis with automatic failover using Sentinel
+
+```bash
+# Enable Sentinel
+REDIS_SENTINEL_ENABLED=true
+
+# Master name (configured in Sentinel)
+REDIS_SENTINEL_MASTER_NAME=mymaster
+
+# Sentinel nodes (minimum 3 for quorum)
+REDIS_SENTINELS=sentinel1:26379,sentinel2:26379,sentinel3:26379
+
+# Optional: Redis password
+REDIS_PASSWORD=your_redis_password
+
+# Optional: Sentinel password
+REDIS_SENTINEL_PASSWORD=your_sentinel_password
+```
+
+**Features**:
+- ✅ Automatic failover detection and handling
+- ✅ Minimum 3 Sentinel nodes for high availability
+- ✅ Master-replica replication
+- ✅ Zero downtime during failovers
+- ✅ Comprehensive health monitoring
+- ✅ In-memory fallback if Redis unavailable
+
+**⚠️ IMPORTANT**: 
+- Redis is optional - application works without it
+- In-memory cache fallback if Redis unavailable
+- Sentinel requires minimum 3 nodes for quorum
+- See `docs/C008_QUICK_REFERENCE.md` for setup guide
+
+---
+
 #### JWT_SECRET
 **Status**: **Auto-generated in development, REQUIRED in production**
 
@@ -125,12 +223,56 @@ JWT_SECRET=<generated-secret>
 - Keep secret secure (password manager, secrets vault)
 
 #### DATABASE_URL
-**Default**: `file:./dev.db` (SQLite)
-**Production**: Use PostgreSQL
+**REQUIRED**: PostgreSQL connection string
+**Production**: PostgreSQL with connection pooling
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/liquor_pos
+# Development
+DATABASE_URL=postgresql://liquor_pos:password@localhost:5432/liquor_pos
+
+# Production (with connection pooling)
+DATABASE_URL=postgresql://liquor_pos:password@prod-host:5432/liquor_pos?connection_limit=20&pool_timeout=10
 ```
+
+**⚠️ IMPORTANT**: 
+- SQLite is no longer supported (migrated to PostgreSQL)
+- PostgreSQL is required for concurrent writes and scalability
+- See `docs/POSTGRESQL_MIGRATION_GUIDE.md` for setup instructions
+
+---
+
+#### Connection Pool Configuration (Optional)
+
+**Purpose**: Fine-tune database connection pooling for optimal performance
+
+```bash
+# Minimum connections in pool (default: 2 dev, 5 prod)
+DATABASE_POOL_MIN=2
+
+# Maximum connections in pool (default: 10 dev, 20 prod)
+DATABASE_POOL_MAX=20
+
+# Idle connection timeout in milliseconds (default: 10000 dev, 30000 prod)
+DATABASE_POOL_IDLE_TIMEOUT=30000
+
+# Connection timeout in milliseconds (default: 5000 dev, 10000 prod)
+DATABASE_POOL_CONNECTION_TIMEOUT=10000
+```
+
+**Default Values by Environment**:
+
+| Environment | Min | Max | Idle Timeout | Connection Timeout |
+|-------------|-----|-----|--------------|-------------------|
+| Development | 2   | 10  | 10s          | 5s                |
+| Test        | 1   | 5   | 5s           | 3s                |
+| Production  | 5   | 20  | 30s          | 10s               |
+
+**⚠️ IMPORTANT**:
+- Pool size is automatically configured based on NODE_ENV
+- Override defaults only if you have specific requirements
+- Too many connections can overwhelm PostgreSQL
+- Too few connections can cause request queuing
+- Monitor pool metrics at `/health` endpoint
 
 ---
 

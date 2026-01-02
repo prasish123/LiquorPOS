@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 
 export interface CacheMetrics {
   hits: number;
@@ -15,6 +15,15 @@ export interface CacheMetrics {
   hitRate: number;
 }
 
+export interface SentinelInfo {
+  enabled: boolean;
+  masterName?: string;
+  sentinels?: Array<{ host: string; port: number }>;
+  currentMaster?: { host: string; port: number };
+  failoverCount: number;
+  lastFailover?: Date;
+}
+
 export interface HealthStatus {
   status: 'up' | 'down' | 'degraded';
   connected: boolean;
@@ -22,6 +31,8 @@ export interface HealthStatus {
   metrics: CacheMetrics;
   lastError?: string;
   lastErrorTime?: Date;
+  sentinel?: SentinelInfo;
+  mode: 'standalone' | 'sentinel';
 }
 
 @Injectable()
@@ -31,6 +42,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private isConnected = false;
   private lastError: string | null = null;
   private lastErrorTime: Date | null = null;
+  private mode: 'standalone' | 'sentinel' = 'standalone';
+
+  // Sentinel tracking
+  private sentinelInfo: SentinelInfo = {
+    enabled: false,
+    failoverCount: 0,
+  };
 
   // Cache metrics
   private metrics = {
@@ -47,9 +65,62 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private cleanupInterval?: NodeJS.Timeout;
 
   async onModuleInit() {
-    // Attempt connection (default to localhost:6379)
-    // Using lazyConnect: true so it doesn't crash app on startup if Redis is missing
-    this.client = new Redis({
+    // Determine if we should use Sentinel or standalone mode
+    const useSentinel = this.shouldUseSentinel();
+
+    if (useSentinel) {
+      this.logger.log('Initializing Redis with Sentinel configuration...');
+      this.initializeSentinel();
+    } else {
+      this.logger.log('Initializing Redis in standalone mode...');
+      this.initializeStandalone();
+    }
+
+    // Setup event handlers
+    this.setupEventHandlers();
+
+    // Attempt connection
+    try {
+      await this.client.connect();
+      this.isConnected = true;
+      const modeStr = this.mode === 'sentinel' ? 'Sentinel' : 'standalone';
+      this.logger.log(`Redis connected successfully in ${modeStr} mode 🚀`);
+
+      if (this.mode === 'sentinel') {
+        await this.updateSentinelInfo();
+      }
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      this.lastError = errorMessage;
+      this.lastErrorTime = new Date();
+      this.logger.error(
+        `Redis connection failed (running in degraded mode with in-memory cache): ${errorMessage}`,
+      );
+      this.isConnected = false;
+    }
+
+    // Start periodic cleanup of expired memory cache entries
+    this.cleanupInterval = setInterval(() => this.cleanupMemoryCache(), 60000); // Every minute
+  }
+
+  /**
+   * Determine if Sentinel should be used based on environment variables
+   */
+  private shouldUseSentinel(): boolean {
+    return !!(
+      process.env.REDIS_SENTINEL_ENABLED === 'true' &&
+      process.env.REDIS_SENTINEL_MASTER_NAME &&
+      process.env.REDIS_SENTINELS
+    );
+  }
+
+  /**
+   * Initialize Redis in standalone mode
+   */
+  private initializeStandalone(): void {
+    this.mode = 'standalone';
+
+    const config: RedisOptions = {
       host: process.env.REDIS_HOST || 'localhost',
       port: Number(process.env.REDIS_PORT) || 6379,
       password: process.env.REDIS_PASSWORD || undefined,
@@ -63,15 +134,93 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         }
         return Math.min(times * 100, 2000); // Backoff
       },
+      enableReadyCheck: true,
+      maxRetriesPerRequest: 3,
+    };
+
+    this.client = new Redis(config);
+    this.logger.log('Redis client initialized in standalone mode', {
+      host: config.host,
+      port: config.port,
+    });
+  }
+
+  /**
+   * Initialize Redis with Sentinel configuration
+   */
+  private initializeSentinel(): void {
+    this.mode = 'sentinel';
+    this.sentinelInfo.enabled = true;
+
+    // Parse sentinel nodes from environment variable
+    // Format: "host1:port1,host2:port2,host3:port3"
+    const sentinelsStr = process.env.REDIS_SENTINELS || '';
+    const sentinels = sentinelsStr.split(',').map((s) => {
+      const [host, port] = s.trim().split(':');
+      return { host, port: parseInt(port, 10) };
     });
 
+    if (sentinels.length < 3) {
+      this.logger.warn(
+        `Redis Sentinel requires minimum 3 nodes for high availability. ` +
+          `Found ${sentinels.length} nodes. Falling back to standalone mode.`,
+      );
+      this.initializeStandalone();
+      return;
+    }
+
+    const masterName = process.env.REDIS_SENTINEL_MASTER_NAME || 'mymaster';
+
+    this.sentinelInfo.masterName = masterName;
+    this.sentinelInfo.sentinels = sentinels;
+
+    const config: RedisOptions = {
+      sentinels,
+      name: masterName,
+      password: process.env.REDIS_PASSWORD || undefined,
+      sentinelPassword: process.env.REDIS_SENTINEL_PASSWORD || undefined,
+      lazyConnect: true,
+      retryStrategy: (times) => {
+        if (times > 5) {
+          this.logger.error(
+            'Redis Sentinel connection failed too many times, disabling caching for this session.',
+          );
+          return null; // Stop retrying
+        }
+        return Math.min(times * 200, 3000); // Backoff
+      },
+      enableReadyCheck: true,
+      maxRetriesPerRequest: 3,
+      sentinelRetryStrategy: (times) => {
+        if (times > 5) {
+          return null;
+        }
+        return Math.min(times * 200, 3000);
+      },
+      // Sentinel-specific options
+      sentinelMaxConnections: 10,
+      enableOfflineQueue: true,
+      connectTimeout: 10000, // 10 seconds
+    };
+
+    this.client = new Redis(config);
+
+    this.logger.log('Redis client initialized with Sentinel', {
+      masterName,
+      sentinels: sentinels.map((s) => `${s.host}:${s.port}`).join(', '),
+    });
+  }
+
+  /**
+   * Setup event handlers for Redis client
+   */
+  private setupEventHandlers(): void {
     this.client.on('error', (err) => {
       this.lastError = err.message;
       this.lastErrorTime = new Date();
       this.metrics.errors++;
 
       if (!this.isConnected) {
-        // If never connected, log once
         this.logger.error(
           `Redis connection failed: ${err.message}. Running in degraded mode with in-memory cache fallback.`,
         );
@@ -85,25 +234,89 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     this.client.on('connect', () => {
       this.isConnected = true;
-      this.logger.log('Redis reconnected successfully');
+      const modeStr = this.mode === 'sentinel' ? 'Sentinel' : 'standalone';
+      this.logger.log(`Redis connected successfully (${modeStr} mode)`);
     });
 
-    try {
-      await this.client.connect();
-      this.isConnected = true;
-      this.logger.log('Redis connected successfully 🚀');
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-      this.lastError = errorMessage;
-      this.lastErrorTime = new Date();
-      this.logger.error(
-        `Redis connection failed (running in degraded mode with in-memory cache): ${errorMessage}`,
-      );
+    this.client.on('ready', () => {
+      this.logger.log('Redis client is ready to accept commands');
+    });
+
+    this.client.on('close', () => {
       this.isConnected = false;
+      this.logger.warn('Redis connection closed');
+    });
+
+    this.client.on('reconnecting', (delay: number) => {
+      this.logger.log(`Redis reconnecting in ${delay}ms...`);
+    });
+
+    // Sentinel-specific events
+    if (this.mode === 'sentinel') {
+      this.client.on(
+        '+switch-master',
+        (
+          masterName: string,
+          oldHost: string,
+          oldPort: string,
+          newHost: string,
+          newPort: string,
+        ) => {
+          this.sentinelInfo.failoverCount++;
+          this.sentinelInfo.lastFailover = new Date();
+          this.sentinelInfo.currentMaster = {
+            host: newHost,
+            port: parseInt(newPort, 10),
+          };
+
+          this.logger.warn(
+            `🔄 Redis Sentinel failover detected! ` +
+              `Master switched from ${oldHost}:${oldPort} to ${newHost}:${newPort}`,
+            {
+              masterName,
+              oldMaster: `${oldHost}:${oldPort}`,
+              newMaster: `${newHost}:${newPort}`,
+              failoverCount: this.sentinelInfo.failoverCount,
+            },
+          );
+        },
+      );
+
+      this.client.on('+sentinel', (sentinel: any) => {
+        this.logger.log('New Sentinel discovered', { sentinel });
+      });
+
+      this.client.on('-sentinel', (sentinel: any) => {
+        this.logger.warn('Sentinel removed', { sentinel });
+      });
+    }
+  }
+
+  /**
+   * Update Sentinel information from Redis
+   */
+  private async updateSentinelInfo(): Promise<void> {
+    if (this.mode !== 'sentinel' || !this.isConnected) {
+      return;
     }
 
-    // Start periodic cleanup of expired memory cache entries
-    this.cleanupInterval = setInterval(() => this.cleanupMemoryCache(), 60000); // Every minute
+    try {
+      // Get current master info using call method
+
+      const info = await (this.client as any).sentinel(
+        'master',
+        this.sentinelInfo.masterName!,
+      );
+      if (info && Array.isArray(info)) {
+        const host = info[3] as string; // ip field
+        const port = parseInt(info[5] as string, 10); // port field
+        this.sentinelInfo.currentMaster = { host, port };
+      }
+    } catch (error) {
+      this.logger.warn('Failed to update Sentinel info', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 
   async onModuleDestroy() {
@@ -261,7 +474,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.client.ping();
         status = 'up';
-        message = 'Redis is healthy';
+        const modeStr = this.mode === 'sentinel' ? 'Sentinel' : 'standalone';
+        message = `Redis is healthy (${modeStr} mode)`;
+
+        // Update Sentinel info if in Sentinel mode
+        if (this.mode === 'sentinel') {
+          await this.updateSentinelInfo();
+        }
       } catch (error) {
         status = 'degraded';
         message = 'Redis connection unstable';
@@ -276,13 +495,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       status,
       connected: this.isConnected,
       message,
+      mode: this.mode,
       metrics: {
         ...this.metrics,
         hitRate: Math.round(hitRate * 100) / 100,
       },
       lastError: this.lastError || undefined,
       lastErrorTime: this.lastErrorTime || undefined,
+      sentinel: this.mode === 'sentinel' ? { ...this.sentinelInfo } : undefined,
     };
+  }
+
+  /**
+   * Get Sentinel information (if in Sentinel mode)
+   */
+  getSentinelInfo(): SentinelInfo | null {
+    return this.mode === 'sentinel' ? { ...this.sentinelInfo } : null;
+  }
+
+  /**
+   * Get current Redis mode
+   */
+  getMode(): 'standalone' | 'sentinel' {
+    return this.mode;
   }
 
   /**

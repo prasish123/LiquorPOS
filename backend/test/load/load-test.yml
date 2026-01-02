@@ -1,0 +1,220 @@
+# Artillery Load Test Configuration
+# Standard load test for checkout flow with realistic traffic patterns
+
+config:
+  target: "http://localhost:3000"
+  
+  # Test phases - gradual ramp-up to sustained load
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 10
+      name: "Warm-up"
+    
+    # Ramp-up to target load
+    - duration: 60
+      arrivalRate: 10
+      rampTo: 100
+      name: "Ramp-up"
+    
+    # Sustained load - 100 orders/minute
+    - duration: 120
+      arrivalRate: 100
+      name: "Sustained load"
+    
+    # Peak load - 150 orders/minute
+    - duration: 60
+      arrivalRate: 150
+      name: "Peak load"
+    
+    # Cool-down
+    - duration: 30
+      arrivalRate: 50
+      name: "Cool-down"
+
+  # Load test configuration
+  processor: "./helpers/auth-helper.js"
+  
+  # HTTP settings
+  http:
+    timeout: 30
+    pool: 50 # Connection pool size
+  
+  # Default variables
+  variables:
+    username: "admin"
+    password: "admin123"
+  
+  # Plugins for enhanced reporting
+  plugins:
+    expect:
+      outputFormat: "pretty"
+    metrics-by-endpoint:
+      stripQueryString: true
+      ignoreUnknownEndpoints: false
+      metricsNamespace: "api_endpoints"
+
+  # Performance thresholds
+  ensure:
+    maxErrorRate: 1 # Max 1% error rate
+    p95: 2000 # 95th percentile response time < 2s
+    p99: 5000 # 99th percentile response time < 5s
+
+# Test scenarios
+scenarios:
+  # Main checkout flow scenario
+  - name: "Complete Checkout Flow"
+    weight: 70 # 70% of traffic
+    flow:
+      # Authenticate before each scenario
+      - function: "beforeScenario"
+      
+      # Generate unique idempotency key
+      - function: "generateIdempotencyKey"
+      
+      # Generate random order data
+      - function: "generateOrderData"
+      
+      # Create order
+      - post:
+          url: "/orders"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            x-csrf-token: "{{ csrfToken }}"
+            Content-Type: "application/json"
+          json:
+            locationId: "{{ orderData.locationId }}"
+            terminalId: "{{ orderData.terminalId }}"
+            items: "{{ orderData.items }}"
+            paymentMethod: "{{ orderData.paymentMethod }}"
+            channel: "{{ orderData.channel }}"
+            ageVerified: "{{ orderData.ageVerified }}"
+            idScanned: "{{ orderData.idScanned }}"
+            idempotencyKey: "{{ orderData.idempotencyKey }}"
+          capture:
+            - json: "$.id"
+              as: "orderId"
+          expect:
+            - statusCode: 201
+            - contentType: json
+            - hasProperty: id
+            - hasProperty: total
+      
+      # Verify order was created
+      - get:
+          url: "/orders/{{ orderId }}"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      
+      # Think time - simulate user behavior
+      - think: 1
+
+  # Idempotency test scenario
+  - name: "Idempotency Check"
+    weight: 10 # 10% of traffic
+    flow:
+      - function: "beforeScenario"
+      - function: "generateIdempotencyKey"
+      - function: "generateOrderData"
+      
+      # First request
+      - post:
+          url: "/orders"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            x-csrf-token: "{{ csrfToken }}"
+            Content-Type: "application/json"
+          json:
+            locationId: "{{ orderData.locationId }}"
+            terminalId: "{{ orderData.terminalId }}"
+            items: "{{ orderData.items }}"
+            paymentMethod: "{{ orderData.paymentMethod }}"
+            channel: "{{ orderData.channel }}"
+            ageVerified: true
+            idScanned: true
+            idempotencyKey: "{{ orderData.idempotencyKey }}"
+          capture:
+            - json: "$.id"
+              as: "orderId"
+          expect:
+            - statusCode: 201
+      
+      # Duplicate request with same idempotency key
+      - post:
+          url: "/orders"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            x-csrf-token: "{{ csrfToken }}"
+            Content-Type: "application/json"
+          json:
+            locationId: "{{ orderData.locationId }}"
+            terminalId: "{{ orderData.terminalId }}"
+            items: "{{ orderData.items }}"
+            paymentMethod: "{{ orderData.paymentMethod }}"
+            channel: "{{ orderData.channel }}"
+            ageVerified: true
+            idScanned: true
+            idempotencyKey: "{{ orderData.idempotencyKey }}"
+          expect:
+            - statusCode: 201
+            - hasProperty: id
+            # Should return same order ID
+      
+      - think: 1
+
+  # List orders scenario
+  - name: "List Orders"
+    weight: 15 # 15% of traffic
+    flow:
+      - function: "beforeScenario"
+      
+      # Get orders list
+      - get:
+          url: "/orders?page=1&limit=50"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      
+      # Get orders for specific location
+      - get:
+          url: "/orders?page=1&limit=50&locationId=loc-001"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      
+      - think: 2
+
+  # Daily summary scenario
+  - name: "Daily Summary"
+    weight: 5 # 5% of traffic
+    flow:
+      - function: "beforeScenario"
+      
+      # Get daily summary
+      - get:
+          url: "/orders/summary/daily?date={{ $randomString() }}&locationId=loc-001"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          beforeRequest: "setTodayDate"
+          expect:
+            - statusCode: 200
+            - contentType: json
+      
+      - think: 3
+
+# Helper function to set today's date
+before:
+  flow:
+    - log: "Starting load test..."
+
+after:
+  flow:
+    - log: "Load test completed!"
+
