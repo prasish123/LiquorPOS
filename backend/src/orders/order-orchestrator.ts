@@ -175,9 +175,17 @@ export class OrderOrchestrator {
       }
 
       // Step 8: Create payment record
+      // Convert OfflinePaymentResult to PaymentResult if needed
+      const paymentRecord: PaymentResult = {
+        paymentId: context.payment.paymentId,
+        method: context.payment.method,
+        amount: context.payment.amount,
+        status: context.payment.status === 'offline_pending' ? 'authorized' : context.payment.status,
+        processorId: context.payment.processorId,
+      };
       await this.paymentAgent.createPaymentRecord(
         transaction.id,
-        context.payment,
+        paymentRecord,
       );
 
       // Step 9: Log payment processing to audit trail
@@ -323,7 +331,15 @@ export class OrderOrchestrator {
     if (context.payment && context.payment.status !== 'failed') {
       this.logger.debug('Compensating: Voiding payment');
       try {
-        await this.paymentAgent.void(context.payment);
+        // Convert OfflinePaymentResult to PaymentResult if needed
+        const paymentToVoid: PaymentResult = {
+          paymentId: context.payment.paymentId,
+          method: context.payment.method,
+          amount: context.payment.amount,
+          status: context.payment.status === 'offline_pending' ? 'authorized' : context.payment.status,
+          processorId: context.payment.processorId,
+        };
+        await this.paymentAgent.void(paymentToVoid);
       } catch (err) {
         this.logger.error('Failed to void payment', err);
       }

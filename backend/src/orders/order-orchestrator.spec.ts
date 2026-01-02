@@ -71,6 +71,19 @@ describe('OrderOrchestrator', () => {
     logPaymentProcessing: jest.fn(),
   };
 
+  const mockOfflinePaymentAgent = {
+    authorize: jest.fn(),
+  };
+
+  const mockNetworkStatusService = {
+    isOnline: jest.fn().mockReturnValue(true),
+  };
+
+  const mockOfflineQueueService = {
+    registerHandler: jest.fn(),
+    queueOperation: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -81,7 +94,10 @@ describe('OrderOrchestrator', () => {
         { provide: PricingAgent, useValue: mockPricingAgent },
         { provide: ComplianceAgent, useValue: mockComplianceAgent },
         { provide: PaymentAgent, useValue: mockPaymentAgent },
+        { provide: 'OfflinePaymentAgent', useValue: mockOfflinePaymentAgent },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: 'NetworkStatusService', useValue: mockNetworkStatusService },
+        { provide: 'OfflineQueueService', useValue: mockOfflineQueueService },
       ],
     }).compile();
 

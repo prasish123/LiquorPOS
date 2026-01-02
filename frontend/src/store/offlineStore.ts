@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db } from '../lib/db';
+import { db } from '../infrastructure/db';
 
 interface OfflineOrder {
     id: string;
@@ -23,9 +23,16 @@ export const useOfflineStore = create<OfflineStore>((set) => ({
 
     saveOrderRequest: async (order) => {
         try {
-            await db.execute({
-                sql: `INSERT INTO pending_orders (id, timestamp, items, total, paymentMethod) VALUES (?, ?, ?, ?, ?)`,
-                args: [order.id, order.timestamp, JSON.stringify(order.items), order.total, order.paymentMethod]
+            await db.orders.add({
+                id: order.id,
+                timestamp: order.timestamp,
+                items: order.items,
+                subtotal: 0,
+                tax: 0,
+                total: order.total,
+                paymentMethod: order.paymentMethod as 'cash' | 'card' | 'split',
+                ageVerified: false,
+                synced: false
             });
             console.log('Order saved to offline DB');
         } catch (error) {
@@ -35,21 +42,13 @@ export const useOfflineStore = create<OfflineStore>((set) => ({
 
     syncOrders: async () => {
         try {
-            const result = await db.execute('SELECT * FROM pending_orders WHERE synced = 0');
-            const orders = result.rows;
+            const orders = await db.orders.where('synced').equals(0).toArray();
 
             if (orders.length === 0) return;
 
             console.log(`Syncing ${orders.length} offline orders...`);
 
-            for (const row of orders) {
-                const order = {
-                    id: row.id,
-                    items: JSON.parse(row.items as string),
-                    total: row.total,
-                    paymentMethod: row.paymentMethod,
-                };
-
+            for (const order of orders) {
                 try {
                     const response = await fetch('http://localhost:3000/api/orders', {
                         method: 'POST',
@@ -65,14 +64,11 @@ export const useOfflineStore = create<OfflineStore>((set) => ({
                     });
 
                     if (response.ok) {
-                        await db.execute({
-                            sql: 'DELETE FROM pending_orders WHERE id = ?',
-                            args: [row.id]
-                        });
-                        console.log(`Synced and removed order ${row.id}`);
+                        await db.orders.delete(order.id);
+                        console.log(`Synced and removed order ${order.id}`);
                     }
                 } catch (err) {
-                    console.error(`Failed to sync order ${row.id}`, err);
+                    console.error(`Failed to sync order ${order.id}`, err);
                 }
             }
         } catch (error) {

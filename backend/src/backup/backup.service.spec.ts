@@ -78,12 +78,18 @@ describe('BackupService', () => {
     });
 
     it('should skip initialization if backup is disabled', async () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'BACKUP_ENABLED') return false;
-        return mockConfigService.get(key);
-      });
+      const disabledConfigService = {
+        get: jest.fn((key: string) => {
+          if (key === 'BACKUP_ENABLED') return false;
+          if (key === 'BACKUP_DIR') return './test-backups';
+          if (key === 'WAL_ARCHIVE_DIR') return './test-wal';
+          if (key === 'BACKUP_RETENTION_DAYS') return '7';
+          if (key === 'S3_BACKUP_ENABLED') return false;
+          return undefined;
+        }),
+      };
 
-      const newService = new BackupService(configService);
+      const newService = new BackupService(disabledConfigService as any);
       await newService.onModuleInit();
 
       // Should not create directories if disabled

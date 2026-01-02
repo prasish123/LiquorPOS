@@ -1,6 +1,5 @@
-import { productRepository } from '../repositories/ProductRepository';
 import { orderRepository } from '../repositories/OrderRepository';
-import { Product, Order, CartItem } from '../../domain/types';
+import { Product, Order } from '../../domain/types';
 import { Logger } from '../services/LoggerService';
 
 // Re-export types for compatibility

@@ -493,7 +493,7 @@ export class BackupService implements OnModuleInit {
    * Get database URL from config
    */
   private getDatabaseUrl(): string {
-    return this.configService.get<string>('DATABASE_URL');
+    return this.configService.get<string>('DATABASE_URL') || 'file:./dev.db';
   }
 
   /**
@@ -520,7 +520,7 @@ export class BackupService implements OnModuleInit {
 
     // Import MonitoringService dynamically to avoid circular dependency
     try {
-      const { MonitoringService } = await import('../monitoring/monitoring.service');
+      const { MonitoringService } = await import('../monitoring/monitoring.service.js');
       const monitoring = new MonitoringService(this.configService);
       await monitoring.sendBackupAlert(type, error);
     } catch (err) {

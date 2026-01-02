@@ -113,9 +113,9 @@ export class OfflineQueueService implements OnModuleInit {
   }
 
   /**
-   * Process queued operations (runs every 2 minutes)
+   * Process queued operations (runs every 5 minutes)
    */
-  @Cron(CronExpression.EVERY_2_MINUTES)
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async processQueue(): Promise<void> {
     if (this.isProcessing) {
       this.logger.debug('Queue processing already in progress, skipping');

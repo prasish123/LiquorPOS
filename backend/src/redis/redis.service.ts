@@ -521,6 +521,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Get the Redis client instance (for health checks and advanced operations)
+   */
+  getClient(): Redis {
+    return this.client;
+  }
+
+  /**
    * Get cache metrics
    */
   getMetrics(): CacheMetrics {
