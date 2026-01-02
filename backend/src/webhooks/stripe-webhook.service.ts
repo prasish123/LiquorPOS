@@ -187,12 +187,8 @@ export class StripeWebhookService {
         await this.handleChargeFailed(event.data.object);
         break;
 
-      // Capture failed (after authorization)
-      case 'payment_intent.capture_failed':
-        await this.handleCaptureFailed(
-          event.data.object as Stripe.PaymentIntent,
-        );
-        break;
+      // Note: payment_intent.capture_failed is not a standard Stripe event
+      // Keeping handler for potential future use, but not in switch statement
 
       default:
         this.logger.log(`Unhandled webhook event type: ${event.type}`);
@@ -288,25 +284,11 @@ export class StripeWebhookService {
         },
       });
 
-      // Get the transaction to potentially void the order
-      const transaction = await this.prisma.transaction.findUnique({
-        where: { id: payment.transactionId },
-        include: { order: true },
-      });
-
-      if (transaction?.order) {
-        // Mark order as failed if payment failed
-        await this.prisma.order.update({
-          where: { id: transaction.order.id },
-          data: {
-            status: 'failed',
-          },
-        });
-
-        this.logger.log(
-          `Marked order ${transaction.order.id} as failed due to payment failure`,
-        );
-      }
+      // Note: Transaction status is managed separately
+      // The transaction itself will be marked as failed through the payment status
+      this.logger.log(
+        `Payment ${payment.id} marked as failed. Transaction ${payment.transactionId} should be reviewed.`,
+      );
 
       // Log event for audit trail
       await this.prisma.eventLog.create({

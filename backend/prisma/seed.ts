@@ -1,13 +1,8 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaLibSql } from '@prisma/adapter-libsql';
 
-// Create Prisma adapter with database URL
-const adapter = new PrismaLibSql({
-    url: process.env.DATABASE_URL || 'file:./dev.db',
-});
-
-// Initialize Prisma with adapter
-const prisma = new PrismaClient({ adapter });
+// Initialize Prisma client
+// Connection URL is configured via prisma.config.ts
+const prisma = new PrismaClient();
 
 async function main() {
     console.log('🌱 Seeding database...');

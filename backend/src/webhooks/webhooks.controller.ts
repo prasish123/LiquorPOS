@@ -2,13 +2,13 @@ import {
   Controller,
   Post,
   Headers,
-  RawBodyRequest,
   Req,
   HttpCode,
   HttpStatus,
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
 import {
   ApiTags,

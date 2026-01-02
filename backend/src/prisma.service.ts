@@ -31,12 +31,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const databaseUrl = this.buildDatabaseUrl();
 
     // Initialize Prisma with PostgreSQL connection pooling
+    // Note: In Prisma 7, connection URL is set via environment variable
+    // and connection pooling is configured via URL parameters
+    process.env.DATABASE_URL = databaseUrl;
+    
     this.prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: databaseUrl,
-        },
-      },
       log: [
         { level: 'query', emit: 'event' },
         { level: 'error', emit: 'stdout' },

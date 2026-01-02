@@ -51,22 +51,18 @@ async function migrateSQLiteToPostgres() {
   console.log('');
 
   // Connect to SQLite (source)
-  const sqlite = new PrismaClient({
-    datasources: {
-      db: {
-        url: sqliteUrl,
-      },
-    },
-  });
+  // Note: In Prisma 7, we set the DATABASE_URL environment variable
+  const originalUrl = process.env.DATABASE_URL;
+  
+  process.env.DATABASE_URL = sqliteUrl;
+  const sqlite = new PrismaClient();
 
   // Connect to PostgreSQL (destination)
-  const postgres = new PrismaClient({
-    datasources: {
-      db: {
-        url: postgresUrl,
-      },
-    },
-  });
+  process.env.DATABASE_URL = postgresUrl;
+  const postgres = new PrismaClient();
+  
+  // Restore original URL
+  process.env.DATABASE_URL = originalUrl || '';
 
   const stats: MigrationStats = {
     users: 0,
