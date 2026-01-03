@@ -1,4 +1,24 @@
-# Florida Liquor Store POS - Technical Architecture
+# System Architecture
+
+## Overview
+
+Florida Liquor Store POS is a modern, cloud-native point-of-sale system built with offline-first architecture, event-driven design, and enterprise-grade security.
+
+## Technology Stack
+
+### Backend
+- **Framework:** NestJS + TypeScript
+- **Database:** PostgreSQL (with Prisma ORM)
+- **Cache/Events:** Redis
+- **Payments:** Stripe
+- **Monitoring:** Sentry
+
+### Frontend
+- **Framework:** React 18 + TypeScript
+- **Build Tool:** Vite
+- **Styling:** Tailwind CSS
+- **State Management:** React Context + Hooks
+- **Offline Storage:** IndexedDB
 
 ## Complete System Architecture
 
