@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigValidationService } from './common/config-validation.service';
 import { LoggerService } from './common/logger.service';
+import { getValidatedConfig } from './config/app.config';
 import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -20,6 +21,23 @@ async function bootstrap() {
   const configValidator = new ConfigValidationService();
   const config = configValidator.validateAndThrow();
   logger.log('Environment validation complete');
+
+  // Validate application configuration (operational settings)
+  logger.log('Validating application configuration...');
+  try {
+    const appConfig = getValidatedConfig();
+    logger.log('Application configuration validated successfully');
+    logger.log(`Configuration loaded: ${JSON.stringify({
+      redis: { memoryCacheSize: appConfig.redis.memoryCacheSize },
+      businessRules: { maxOrderQuantity: appConfig.businessRules.maxOrderQuantity },
+      backup: { schedule: appConfig.backup.schedule },
+    })}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('❌ Application configuration validation failed');
+    logger.error(errorMessage);
+    throw error;
+  }
 
   // HTTPS configuration for production
   const httpsOptions =
