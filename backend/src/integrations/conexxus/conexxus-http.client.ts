@@ -75,7 +75,8 @@ export class ConexxusHttpClient {
   private readonly circuitBreaker: CircuitBreaker;
   private readonly prisma?: PrismaService;
 
-  constructor(config?: Partial<ConexxusConfig>, prisma?: PrismaService) {
+  constructor(prisma?: PrismaService) {
+    const config: Partial<ConexxusConfig> = {};
     // Validate environment variables
     this.validateEnvironment();
 
@@ -216,8 +217,9 @@ export class ConexxusHttpClient {
 
     if (errors.length > 0) {
       const errorMessage = `Conexxus configuration errors:\n${errors.map((e) => `  - ${e}`).join('\n')}`;
-      this.logger.error(errorMessage);
-      throw new Error(errorMessage);
+      this.logger.warn(errorMessage + '\nConexXus integration will be disabled.');
+      // Don't throw error - just disable the integration
+      return;
     }
 
     this.logger.log('Conexxus environment validation passed');

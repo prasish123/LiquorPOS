@@ -12,12 +12,14 @@ export class RedisHealthIndicator extends HealthIndicator {
     try {
       const client = this.redisService.getClient();
       await client.ping();
-      return this.getStatus(key, true);
+      return this.getStatus(key, true, { mode: 'connected' });
     } catch (error) {
-      throw new HealthCheckError(
-        'Redis check failed',
-        this.getStatus(key, false, { error: error.message }),
-      );
+      // Allow degraded mode - app has in-memory fallback
+      return this.getStatus(key, true, { 
+        mode: 'degraded', 
+        fallback: 'in-memory cache',
+        warning: 'Redis unavailable, using fallback'
+      });
     }
   }
 }

@@ -67,7 +67,7 @@ export class ConexxusService {
 
     if (this.isEnabled) {
       try {
-        this.httpClient = new ConexxusHttpClient(undefined, this.prisma);
+        this.httpClient = new ConexxusHttpClient(this.prisma);
         this.logger.log(
           'Conexxus service initialized with HTTP client and circuit breaker',
         );

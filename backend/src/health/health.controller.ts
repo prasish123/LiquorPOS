@@ -27,12 +27,15 @@ export class HealthController {
   @HealthCheck()
   @ApiOperation({ summary: 'Health check' })
   check() {
+    // Use C:\ for Windows, / for Linux/Mac
+    const diskPath = process.platform === 'win32' ? 'C:\\' : '/';
+    
     return this.health.check([
       () => this.prisma.isHealthy('database'),
       () => this.redis.isHealthy('redis'),
       () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024), // 300MB
       () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024), // 500MB
-      () => this.disk.checkStorage('disk', { path: '/', thresholdPercent: 0.9 }),
+      () => this.disk.checkStorage('disk', { path: diskPath, thresholdPercent: 0.9 }),
       () => this.backup.isHealthy('backup'),
     ]);
   }

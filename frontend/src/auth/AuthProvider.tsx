@@ -60,10 +60,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const logout = async () => {
         try {
-            await fetch(`${API_URL}/auth/logout`, {
-                method: 'POST',
+            // Get CSRF token for logout
+            const csrfResponse = await fetch(`${API_URL}/auth/csrf-token`, {
                 credentials: 'include',
             });
+            
+            if (csrfResponse.ok) {
+                const { csrfToken } = await csrfResponse.json();
+                
+                await fetch(`${API_URL}/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'x-csrf-token': csrfToken,
+                    },
+                    credentials: 'include',
+                });
+            }
         } catch (err) {
             console.error('Logout request failed:', err);
         } finally {

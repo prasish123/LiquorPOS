@@ -1,5 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import { LoggerService } from './common/logger.service';
 
 export interface ConnectionPoolConfig {
@@ -31,9 +33,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const databaseUrl = this.buildDatabaseUrl();
 
     // Initialize Prisma with PostgreSQL connection pooling
-    // Note: In Prisma 7, connection URL is set via environment variable
-    // and connection pooling is configured via URL parameters
-    process.env.DATABASE_URL = databaseUrl;
+    // Note: In Prisma 7, we use the pg adapter for direct database connections
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      min: this.poolConfig.min,
+      max: this.poolConfig.max,
+      idleTimeoutMillis: this.poolConfig.idleTimeout,
+      connectionTimeoutMillis: this.poolConfig.connectionTimeout,
+    });
+
+    const adapter = new PrismaPg(pool);
     
     this.prisma = new PrismaClient({
       log: [
@@ -41,6 +50,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         { level: 'error', emit: 'stdout' },
         { level: 'warn', emit: 'stdout' },
       ],
+      adapter,
     });
 
     // Log connection pool configuration

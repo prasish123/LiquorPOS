@@ -25,6 +25,6 @@ import { PrismaService } from '../prisma.service';
     PrismaService,
   ],
   controllers: [OrdersController],
-  exports: [OrdersService],
+  exports: [OrdersService, OrderOrchestrator],
 })
 export class OrdersModule {}

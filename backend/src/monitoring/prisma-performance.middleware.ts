@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaService } from '../prisma.service';
 import { PerformanceMonitoringService } from './performance-monitoring.service';
 import { MetricsService } from './metrics.service';
 
@@ -12,37 +12,18 @@ export class PrismaPerformanceMiddleware implements OnModuleInit {
   private readonly SLOW_QUERY_THRESHOLD = 1000; // 1 second
 
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly prisma: PrismaService,
     private readonly performanceMonitoring: PerformanceMonitoringService,
     private readonly metrics: MetricsService,
   ) {}
 
   onModuleInit() {
-    // Add Prisma middleware for performance tracking
-    // Note: $use method exists on PrismaClient but TypeScript doesn't recognize it
-
-    (this.prisma as any).$use(async (params: any, next: any) => {
-      const startTime = Date.now();
-
-      try {
-        const result = await next(params);
-        const duration = Date.now() - startTime;
-
-        // Track query performance
-        this.trackQuery(params, duration, true);
-
-        return result;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-
-        // Track failed query
-        this.trackQuery(params, duration, false, error);
-
-        throw error;
-      }
-    });
-
-    this.logger.log('Prisma performance monitoring middleware initialized');
+    // Prisma 7 removed $use middleware
+    // TODO: Implement performance tracking using Prisma 7's new extension system
+    // See: https://www.prisma.io/docs/concepts/components/prisma-client/client-extensions
+    
+    this.logger.warn('Prisma performance middleware disabled - $use removed in Prisma 7');
+    this.logger.log('Prisma performance monitoring middleware initialized (disabled)');
   }
 
   /**

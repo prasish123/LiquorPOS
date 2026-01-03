@@ -17,17 +17,32 @@ export function Login() {
 
         try {
             const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            
+            // Step 1: Get CSRF token
+            const csrfResponse = await fetch(`${API_URL}/auth/csrf-token`, {
+                credentials: 'include', // Important: Get the csrf-token cookie
+            });
+            
+            if (!csrfResponse.ok) {
+                throw new Error('Failed to get CSRF token');
+            }
+            
+            const { csrfToken } = await csrfResponse.json();
+            
+            // Step 2: Login with CSRF token
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'x-csrf-token': csrfToken, // Include CSRF token in header
                 },
                 credentials: 'include', // Send cookies
                 body: JSON.stringify({ username, password }),
             });
 
             if (!response.ok) {
-                throw new Error('Invalid credentials');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Invalid credentials');
             }
 
             const data = await response.json();
@@ -40,7 +55,8 @@ export function Login() {
                 navigate('/pos');
             }
         } catch (err) {
-            setError('Login failed. Please check your credentials.');
+            const errorMessage = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+            setError(errorMessage);
             console.error(err);
         } finally {
             setLoading(false);

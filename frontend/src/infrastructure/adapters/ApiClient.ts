@@ -53,7 +53,59 @@ class ApiClient {
             items: order.items.length
         });
 
+        // Save to local IndexedDB first (offline support)
         await orderRepository.save(order);
+
+        // NEW: Also send to backend API
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            
+            // Get CSRF token
+            const csrfResponse = await fetch(`${API_URL}/auth/csrf-token`, {
+                credentials: 'include',
+            });
+            const { csrfToken } = await csrfResponse.json();
+
+            // Send order to backend
+            const response = await fetch(`${API_URL}/orders`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': csrfToken,
+                },
+                credentials: 'include', // Send JWT cookie
+                body: JSON.stringify({
+                    locationId: orderRequest.locationId,
+                    terminalId: orderRequest.terminalId,
+                    items: orderRequest.items,
+                    paymentMethod: orderRequest.paymentMethod,
+                    channel: orderRequest.channel,
+                    ageVerified: orderRequest.ageVerified,
+                    idempotencyKey: id, // Use order ID as idempotency key
+                }),
+            });
+
+            if (response.ok) {
+                Logger.info("Order synced to backend successfully", { orderId: id });
+                // Mark as synced in IndexedDB
+                order.synced = true;
+                await orderRepository.save(order);
+            } else {
+                const errorText = await response.text();
+                Logger.error("Failed to sync order to backend", { 
+                    orderId: id, 
+                    status: response.status,
+                    error: errorText 
+                });
+                // Order still saved locally, will sync later
+            }
+        } catch (error) {
+            Logger.error("Error syncing order to backend", { 
+                orderId: id, 
+                error: error instanceof Error ? error.message : 'Unknown error' 
+            });
+            // Order still saved locally, will sync later
+        }
 
         return { id, success: true };
     }

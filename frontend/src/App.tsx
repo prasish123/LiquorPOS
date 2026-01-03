@@ -4,6 +4,9 @@ import { Login } from './pages/Login';
 import { POSTerminal } from './pages/POSTerminal';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AdminDashboard } from './pages/Admin/Dashboard';
+import { AdminProducts } from './pages/Admin/Products';
+import { AdminUsers } from './pages/Admin/Users';
+import { AdminSettings } from './pages/Admin/Settings';
 import { OfflineBanner } from './components/OfflineBanner';
 import { Toast } from './components/Toast';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
@@ -47,6 +50,9 @@ function App() {
               </ProtectedRoute>
             }>
               <Route index element={<AdminDashboard />} />
+              <Route path="products" element={<AdminProducts />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
 
             {/* Default redirect to POS */}

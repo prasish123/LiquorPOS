@@ -1,8 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
-// Initialize Prisma client
-// Connection URL is configured via prisma.config.ts
-const prisma = new PrismaClient();
+// Initialize Prisma client with adapter for Prisma 7
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/liquor_pos';
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
     console.log('🌱 Seeding database...');
@@ -198,4 +202,5 @@ main()
     })
     .finally(async () => {
         await prisma.$disconnect();
+        await pool.end();
     });

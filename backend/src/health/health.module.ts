@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
-import { RedisHealthIndicator } from './redis-health.indicator';
+import { PrismaHealthIndicator } from './prisma.health';
+import { RedisHealthIndicator } from './redis.health';
 import { ConexxusHealthIndicator } from './conexxus-health.indicator';
 import { EncryptionHealthIndicator } from './encryption-health.indicator';
 import { BackupHealthIndicator } from './backup.health';
@@ -15,6 +16,7 @@ import { EncryptionService } from '../common/encryption.service';
   imports: [TerminusModule, RedisModule, BackupModule],
   controllers: [HealthController],
   providers: [
+    PrismaHealthIndicator,
     RedisHealthIndicator,
     ConexxusHealthIndicator,
     EncryptionHealthIndicator,
