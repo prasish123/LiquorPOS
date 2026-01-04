@@ -28,7 +28,7 @@ describe('Payment Integration (e2e)', () => {
     process.env.NODE_ENV = 'test';
     process.env.STRIPE_SECRET_KEY =
       process.env.STRIPE_SECRET_KEY || 'sk_test_mock';
-    process.env.AUDIT_LOG_ENCRYPTION_KEY = 'test-encryption-key-32-bytes-long!';
+    process.env.AUDIT_LOG_ENCRYPTION_KEY = 'cF1Ds+TIJ+LtW37PvZeHZ8Viav/e5UimfKvZsU2HAzA='; // Base64-encoded 32 bytes
     process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -79,8 +79,7 @@ describe('Payment Integration (e2e)', () => {
         address: '123 Test St',
         city: 'Test City',
         state: 'FL',
-        zipCode: '12345',
-        phone: '555-0100',
+        zip: '12345',
       },
     });
     testLocationId = location.id;

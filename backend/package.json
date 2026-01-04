@@ -42,7 +42,8 @@
     "dr:restore": "ts-node scripts/disaster-recovery/restore-database.ts",
     "dr:test": "ts-node scripts/disaster-recovery/test-dr-procedures.ts",
     "dr:list-backups": "curl http://localhost:3000/api/backup/list -H \"Authorization: Bearer $ADMIN_TOKEN\"",
-    "backup:create": "curl -X POST http://localhost:3000/api/backup/create -H \"Authorization: Bearer $ADMIN_TOKEN\""
+    "backup:create": "curl -X POST http://localhost:3000/api/backup/create -H \"Authorization: Bearer $ADMIN_TOKEN\"",
+    "test:loki": "ts-node scripts/test-loki-integration.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -84,7 +85,8 @@
     "stripe": "^20.1.0",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.19.0",
-    "winston-daily-rotate-file": "^5.0.0"
+    "winston-daily-rotate-file": "^5.0.0",
+    "winston-transport": "^4.9.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

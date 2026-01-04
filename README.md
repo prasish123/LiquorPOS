@@ -29,10 +29,21 @@ npm install && npm run dev
 
 ## Documentation
 
+### Getting Started
 - [Setup Guide](docs/setup.md) - Installation and configuration
 - [Configuration](docs/configuration.md) - Environment variables
 - [Deployment](docs/deployment.md) - Production deployment
-- [Architecture](docs/architecture.md) - System design
+
+### Architecture & Design
+- [Architecture](docs/architecture.md) - System design overview
+- [Visual Diagrams](docs/DIAGRAMS_SUMMARY.md) - **70+ Mermaid diagrams** 🎨
+  - [Architecture Diagrams](docs/VISUAL_ARCHITECTURE_DIAGRAMS.md) - System architecture, sequences, patterns
+  - [UI Configuration](docs/UI_CONFIGURATION_GUIDE.md) - UI customization, business rules
+  - [Deployment & Integration](docs/DEPLOYMENT_INTEGRATION_DIAGRAMS.md) - CI/CD, monitoring, scaling
+  - [Complete Index](docs/DIAGRAMS_INDEX.md) - Quick reference for all diagrams
+
+### Reference
+- [Product Requirements](docs/PRD.md) - Product specifications
 - [Known Limitations](docs/known-limitations.md) - Missing features
 
 ## Requirements

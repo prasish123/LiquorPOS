@@ -39,7 +39,7 @@ describe('OrderOrchestrator Integration Tests', () => {
 
   beforeAll(async () => {
     // Set required environment variables for testing
-    process.env.AUDIT_LOG_ENCRYPTION_KEY = 'test-encryption-key-32-bytes-long!';
+    process.env.AUDIT_LOG_ENCRYPTION_KEY = 'cF1Ds+TIJ+LtW37PvZeHZ8Viav/e5UimfKvZsU2HAzA='; // Base64-encoded 32 bytes
     process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 
     const module: TestingModule = await Test.createTestingModule({

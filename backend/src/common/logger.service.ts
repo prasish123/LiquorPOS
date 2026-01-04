@@ -2,6 +2,8 @@ import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
 import * as winston from 'winston';
 import * as DailyRotateFile from 'winston-daily-rotate-file';
 import * as cls from 'cls-hooked';
+import { LokiTransport } from './logger/loki-transport';
+import { getAppConfig } from '../config/app.config';
 
 // Create namespace for request context
 const namespace = cls.createNamespace('app-context');
@@ -27,6 +29,15 @@ export class LoggerService implements NestLoggerService {
     const logLevel = process.env.LOG_LEVEL || 'info';
     const logDir = process.env.LOG_DIR || 'logs';
     const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Load app config for observability settings
+    let appConfig;
+    try {
+      appConfig = getAppConfig();
+    } catch (error) {
+      // If config fails to load, continue without Loki
+      console.warn('Failed to load app config, Loki integration disabled:', error);
+    }
 
     // Custom format for structured logging
     const structuredFormat = winston.format.combine(
@@ -89,6 +100,28 @@ export class LoggerService implements NestLoggerService {
         level: 'error',
       });
       transports.push(errorTransport);
+    }
+
+    // Loki transport (if enabled)
+    if (appConfig?.observability.lokiEnabled && appConfig?.observability.lokiUrl) {
+      try {
+        const lokiTransport = new LokiTransport({
+          host: appConfig.observability.lokiUrl,
+          labels: {
+            service: 'liquor-pos-backend',
+            location: appConfig.location.id,
+            environment: appConfig.nodeEnv,
+          },
+          batching: true,
+          batchInterval: appConfig.observability.lokiBatchInterval,
+          maxBatchSize: appConfig.observability.lokiMaxBatchSize,
+          maxRetries: appConfig.observability.lokiMaxRetries,
+        });
+        transports.push(lokiTransport);
+        console.log(`✅ Loki transport enabled: ${appConfig.observability.lokiUrl}`);
+      } catch (error) {
+        console.error('Failed to initialize Loki transport:', error);
+      }
     }
 
     return winston.createLogger({

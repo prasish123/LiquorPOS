@@ -130,4 +130,43 @@ export class AuditService {
       },
     });
   }
+
+  /**
+   * Log price override to audit trail
+   */
+  async logPriceOverride(
+    transactionId: string,
+    sku: string,
+    originalPrice: number,
+    overridePrice: number,
+    reason: string,
+    managerId: string,
+    cashierId: string | undefined,
+    context: AuditContext,
+  ): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        eventType: 'PRICE_OVERRIDE',
+        userId: managerId,
+        action: 'override_price',
+        resourceId: transactionId,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        result: 'success',
+        details: this.encryption.encrypt(
+          JSON.stringify({
+            sku,
+            originalPrice,
+            overridePrice,
+            discount: originalPrice - overridePrice,
+            discountPercent:
+              ((originalPrice - overridePrice) / originalPrice) * 100,
+            reason,
+            managerId,
+            cashierId,
+          }),
+        ),
+      },
+    });
+  }
 }

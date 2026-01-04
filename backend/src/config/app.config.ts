@@ -58,6 +58,20 @@ export interface AppConfig {
     maxOrderQuantity: number;
     maxTransactionAmount: number;
   };
+
+  // Observability Configuration
+  observability: {
+    lokiUrl?: string;
+    lokiEnabled: boolean;
+    lokiBatchInterval: number;
+    lokiMaxBatchSize: number;
+    lokiMaxRetries: number;
+  };
+
+  // Location Configuration
+  location: {
+    id: string;
+  };
 }
 
 /**
@@ -150,6 +164,21 @@ export function getAppConfig(): AppConfig {
         10,
       ),
     },
+
+    observability: {
+      lokiUrl: process.env.LOKI_URL,
+      lokiEnabled: process.env.LOKI_ENABLED === 'true',
+      lokiBatchInterval: parseInt(
+        process.env.LOKI_BATCH_INTERVAL || '5000',
+        10,
+      ),
+      lokiMaxBatchSize: parseInt(process.env.LOKI_MAX_BATCH_SIZE || '100', 10),
+      lokiMaxRetries: parseInt(process.env.LOKI_MAX_RETRIES || '3', 10),
+    },
+
+    location: {
+      id: process.env.LOCATION_ID || 'default-location',
+    },
   };
 }
 
@@ -205,6 +234,28 @@ export function validateAppConfig(config: AppConfig): void {
   // Validate offline queue config
   if (config.offlineQueue.cleanupDays < 1) {
     errors.push('OFFLINE_QUEUE_CLEANUP_DAYS must be at least 1');
+  }
+
+  // Validate observability config
+  if (config.observability.lokiEnabled && !config.observability.lokiUrl) {
+    errors.push('LOKI_URL is required when LOKI_ENABLED is true');
+  }
+
+  if (config.observability.lokiBatchInterval < 100) {
+    errors.push('LOKI_BATCH_INTERVAL must be at least 100ms');
+  }
+
+  if (config.observability.lokiMaxBatchSize < 1) {
+    errors.push('LOKI_MAX_BATCH_SIZE must be at least 1');
+  }
+
+  if (config.observability.lokiMaxRetries < 0) {
+    errors.push('LOKI_MAX_RETRIES must be at least 0');
+  }
+
+  // Validate location config
+  if (!config.location.id || config.location.id.trim() === '') {
+    errors.push('LOCATION_ID must be set to a non-empty string');
   }
 
   if (errors.length > 0) {

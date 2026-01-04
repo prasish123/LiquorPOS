@@ -9,10 +9,13 @@ import { ComplianceAgent } from './agents/compliance.agent';
 import { PaymentAgent } from './agents/payment.agent';
 import { OfflinePaymentAgent } from './agents/offline-payment.agent';
 import { AuditService } from './audit.service';
+import { PriceOverrideService } from './price-override.service';
+import { PriceOverrideController } from './price-override.controller';
 import { PrismaService } from '../prisma.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [EventEmitterModule.forRoot()],
+  imports: [EventEmitterModule.forRoot(), AuthModule],
   providers: [
     OrdersService,
     OrderOrchestrator,
@@ -22,9 +25,10 @@ import { PrismaService } from '../prisma.service';
     PaymentAgent,
     OfflinePaymentAgent,
     AuditService,
+    PriceOverrideService,
     PrismaService,
   ],
-  controllers: [OrdersController],
-  exports: [OrdersService, OrderOrchestrator],
+  controllers: [OrdersController, PriceOverrideController],
+  exports: [OrdersService, OrderOrchestrator, PriceOverrideService],
 })
 export class OrdersModule {}

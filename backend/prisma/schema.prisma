@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -16,15 +15,24 @@ enum Role {
   CASHIER
 }
 
+enum OverrideReason {
+  PRICE_MATCH
+  DAMAGED_GOODS
+  CUSTOMER_SATISFACTION
+  OTHER
+}
+
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
   password  String   // Hashed
-  pin       String?  // Quick access for cashiers, 4-6 digits
+  pin       String?  // Quick access for cashiers, 4-6 digits (hashed)
   firstName String
   lastName  String
   role      Role     @default(CASHIER)
   active    Boolean  @default(true)
+  
+  priceOverrides  PriceOverride[] @relation("ManagerOverrides")
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -114,6 +122,10 @@ model Location {
   licenseNumber  String?
   licenseExpiry  DateTime?
   
+  // Receipt configuration
+  receiptHeader  String?  // Custom header text
+  receiptFooter  String?  // Custom footer text (e.g., "Thank you!")
+  
   inventory      Inventory[]
   transactions   Transaction[]
   
@@ -154,6 +166,8 @@ model Transaction {
   
   items           TransactionItem[]
   payments        Payment[]
+  priceOverrides  PriceOverride[]
+  receipt         Receipt?
   location        Location @relation(fields: [locationId], references: [id])
   customer        Customer? @relation(fields: [customerId], references: [id])
   
@@ -167,18 +181,22 @@ model Transaction {
 }
 
 model TransactionItem {
-  id            String      @id @default(uuid())
-  transactionId String
+  id              String      @id @default(uuid())
+  transactionId   String
   
-  sku           String
-  name          String
-  quantity      Int
-  unitPrice     Float
-  discount      Float       @default(0)
-  tax           Float
-  total         Float
+  sku             String
+  name            String
+  quantity        Int
+  unitPrice       Float
+  discount        Float       @default(0)
+  tax             Float
+  total           Float
   
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  // Price override tracking
+  originalPrice   Float?      // Set if price was overridden
+  priceOverridden Boolean     @default(false)
+  
+  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   
   @@index([transactionId])
 }
@@ -259,4 +277,120 @@ model AuditLog {
   @@index([eventType])
   @@index([userId])
   @@index([timestamp])
+}
+
+model PriceOverride {
+  id              String         @id @default(uuid())
+  transactionId   String
+  itemId          String
+  
+  // Override details
+  originalPrice   Float
+  overridePrice   Float
+  reason          OverrideReason
+  reasonNotes     String?        // For "OTHER" reason
+  
+  // Manager approval
+  managerId       String
+  managerName     String         // Cached for audit trail
+  approvedAt      DateTime       @default(now())
+  
+  // Audit trail
+  cashierId       String?
+  cashierName     String?
+  terminalId      String?
+  
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  manager         User @relation("ManagerOverrides", fields: [managerId], references: [id])
+  
+  @@index([transactionId])
+  @@index([managerId])
+  @@index([approvedAt])
+}
+
+model Receipt {
+  id              String   @id @default(uuid())
+  transactionId   String   @unique
+  
+  // Receipt content (pre-rendered for reprints)
+  content         String   // Plain text receipt
+  htmlContent     String?  // HTML version for browser print
+  
+  // Metadata
+  printedAt       DateTime?
+  reprintCount    Int      @default(0)
+  lastReprintAt   DateTime?
+  
+  transaction     Transaction @relation(fields: [transactionId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([transactionId])
+}
+
+model PaymentTerminal {
+  id              String    @id @default(uuid())
+  name            String
+  type            String    // pax, ingenico, verifone, virtual
+  locationId      String
+  
+  // Connection details
+  ipAddress       String?
+  port            Int?
+  serialNumber    String?   @unique
+  model           String?
+  
+  // Status
+  enabled         Boolean   @default(true)
+  firmwareVersion String?
+  lastHeartbeat   DateTime?
+  
+  // Metadata
+  metadata        String?   // JSON for additional config
+  
+  // Soft delete
+  deletedAt       DateTime?
+  
+  location        Location  @relation(fields: [locationId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([locationId])
+  @@index([type])
+  @@index([enabled])
+  @@index([serialNumber])
+}
+
+model PaxTransaction {
+  id                String   @id @default(uuid())
+  terminalId        String
+  transactionId     String?  // Link to main Transaction if applicable
+  
+  // Transaction details
+  transactionType   String   // sale, refund, void, auth, capture
+  amount            Float
+  referenceNumber   String   @unique
+  invoiceNumber     String?
+  
+  // Response details
+  success           Boolean
+  responseCode      String
+  responseMessage   String
+  authCode          String?
+  
+  // Card details
+  cardType          String?
+  last4             String?
+  
+  // Metadata
+  rawRequest        String?  // JSON of request
+  rawResponse       String?  // JSON of response
+  
+  createdAt         DateTime @default(now())
+  
+  @@index([terminalId])
+  @@index([transactionId])
+  @@index([referenceNumber])
+  @@index([createdAt])
 }

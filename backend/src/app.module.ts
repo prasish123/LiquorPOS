@@ -21,6 +21,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { BackupModule } from './backup/backup.module';
+import { ReceiptsModule } from './receipts/receipts.module';
+import { PaymentsModule } from './payments/payments.module';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
 import { AppExceptionFilter } from './common/filters/app-exception.filter';
 
@@ -58,6 +60,8 @@ import { AppExceptionFilter } from './common/filters/app-exception.filter';
     MonitoringModule,
     ReportingModule,
     BackupModule,
+    ReceiptsModule,
+    PaymentsModule,
     AIModule,
     ProductsModule,
     OrdersModule,

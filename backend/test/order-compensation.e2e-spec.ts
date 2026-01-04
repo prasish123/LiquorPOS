@@ -18,7 +18,7 @@ describe('Order Compensation (SAGA Pattern) Integration Tests (e2e)', () => {
     // Set required environment variables for testing
     process.env.JWT_SECRET = 'test-jwt-secret-key-for-integration-tests';
     process.env.AUDIT_LOG_ENCRYPTION_KEY =
-      'dGVzdC1hdWRpdC1sb2ctZW5jcnlwdGlvbi1rZXk=';
+      'cF1Ds+TIJ+LtW37PvZeHZ8Viav/e5UimfKvZsU2HAzA='; // Base64-encoded 32 bytes
     process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
     process.env.NODE_ENV = 'test';
@@ -73,7 +73,7 @@ describe('Order Compensation (SAGA Pattern) Integration Tests (e2e)', () => {
         address: '456 Comp St',
         city: 'Comp City',
         state: 'CS',
-        zipCode: '54321',
+        zip: '54321',
         licenseNumber: `COMP-${Date.now()}`,
         licenseExpiry: new Date('2030-12-31'),
       },

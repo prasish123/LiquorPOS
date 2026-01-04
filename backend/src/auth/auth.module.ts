@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaService } from '../prisma.service';
 import { JwtStrategy } from './jwt.strategy';
+import { PinAuthService } from './pin-auth.service';
 import { RedisModule } from '../redis/redis.module';
 import { ConfigValidationService } from '../common/config-validation.service';
 
@@ -23,8 +24,8 @@ import { ConfigValidationService } from '../common/config-validation.service';
     }),
     RedisModule,
   ],
-  providers: [AuthService, PrismaService, JwtStrategy],
+  providers: [AuthService, PinAuthService, PrismaService, JwtStrategy],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, PinAuthService],
 })
 export class AuthModule {}

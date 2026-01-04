@@ -1,0 +1,132 @@
+.features {
+  background-color: var(--color-bg-secondary);
+  padding: var(--spacing-2xl) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  margin: var(--spacing-xl) auto;
+}
+
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-xl);
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-lg) 0;
+}
+
+.feature-row:last-child {
+  margin-bottom: 0;
+}
+
+.feature-row.reverse {
+  direction: rtl;
+}
+
+.feature-row.reverse > * {
+  direction: ltr;
+}
+
+.feature-content h3 {
+  font-size: 32px;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text);
+}
+
+.feature-content p {
+  font-size: 17px;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-secondary);
+}
+
+.feature-data {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.data-point {
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  padding: 6px 12px;
+  background: white;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  width: fit-content;
+}
+
+.feature-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.pricing-card,
+.profit-card,
+.alert-card {
+  background: white;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  width: 100%;
+  max-width: 350px;
+}
+
+.price-row,
+.profit-row {
+  padding: var(--spacing-sm);
+  font-size: 17px;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.price-row:last-child,
+.profit-row:last-child {
+  border-bottom: none;
+}
+
+.profit-result {
+  padding: var(--spacing-sm);
+  font-size: 19px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-success);
+  background-color: rgba(48, 209, 88, 0.1);
+  border-radius: var(--radius-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.alert-card {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+}
+
+.alert-icon {
+  font-size: 32px;
+}
+
+.alert-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.alert-text strong {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  font-size: 17px;
+}
+
+@media (max-width: 768px) {
+  .feature-row,
+  .feature-row.reverse {
+    grid-template-columns: 1fr;
+    direction: ltr;
+  }
+  
+  .feature-content h3 {
+    font-size: 24px;
+  }
+}
+
