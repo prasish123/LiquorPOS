@@ -205,6 +205,26 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.user;
   }
 
+  get complianceEvent() {
+    return this.prisma.complianceEvent;
+  }
+
+  get priceOverride() {
+    return this.prisma.priceOverride;
+  }
+
+  get receipt() {
+    return this.prisma.receipt;
+  }
+
+  get paymentTerminal() {
+    return this.prisma.paymentTerminal;
+  }
+
+  get paxTransaction() {
+    return this.prisma.paxTransaction;
+  }
+
   // Expose $transaction for advanced operations
   get $transaction() {
     return this.prisma.$transaction.bind(this.prisma);
