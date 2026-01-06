@@ -199,14 +199,8 @@ describe('OrderOrchestrator', () => {
       expect(result).toBeDefined();
       expect(result.id).toBe('txn-1');
       expect(result.paymentStatus).toBe('completed');
-      expect(inventoryAgent.checkAndReserve).toHaveBeenCalledWith(
-        'loc-1',
-        orderDto.items,
-      );
-      expect(pricingAgent.calculate).toHaveBeenCalledWith(
-        orderDto.items,
-        orderDto.locationId,
-      );
+      expect(inventoryAgent.checkAndReserve).toHaveBeenCalledWith('loc-1', orderDto.items);
+      expect(pricingAgent.calculate).toHaveBeenCalledWith(orderDto.items, orderDto.locationId);
       expect(complianceAgent.verifyAge).toHaveBeenCalled();
       expect(paymentAgent.authorize).toHaveBeenCalled();
       expect(inventoryAgent.commit).toHaveBeenCalled();
@@ -354,9 +348,7 @@ describe('OrderOrchestrator', () => {
       });
 
       // Compliance fails
-      mockComplianceAgent.verifyAge.mockRejectedValue(
-        new Error('Age verification required'),
-      );
+      mockComplianceAgent.verifyAge.mockRejectedValue(new Error('Age verification required'));
 
       await expect(orchestrator.processOrder(orderDto)).rejects.toThrow();
 
@@ -406,9 +398,7 @@ describe('OrderOrchestrator', () => {
       });
 
       // Transaction creation fails
-      mockPrismaService.transaction.create.mockRejectedValue(
-        new Error('Database error'),
-      );
+      mockPrismaService.transaction.create.mockRejectedValue(new Error('Database error'));
 
       await expect(orchestrator.processOrder(orderDto)).rejects.toThrow();
 
@@ -499,9 +489,7 @@ describe('OrderOrchestrator', () => {
         new Error('Insufficient inventory for SKU-001'),
       );
 
-      await expect(orchestrator.processOrder(orderDto)).rejects.toThrow(
-        'Insufficient inventory',
-      );
+      await expect(orchestrator.processOrder(orderDto)).rejects.toThrow('Insufficient inventory');
     });
 
     it('should reject order without age verification for restricted items', async () => {
@@ -610,10 +598,7 @@ describe('OrderOrchestrator', () => {
 
       await orchestrator.processOrder(orderDto);
 
-      expect(eventEmitter.emit).toHaveBeenCalledWith(
-        'order.created',
-        expect.any(Object),
-      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith('order.created', expect.any(Object));
     });
   });
 
@@ -629,9 +614,7 @@ describe('OrderOrchestrator', () => {
         idempotencyKey: 'test-key-9',
       };
 
-      mockInventoryAgent.checkAndReserve.mockRejectedValue(
-        new Error('Unexpected database error'),
-      );
+      mockInventoryAgent.checkAndReserve.mockRejectedValue(new Error('Unexpected database error'));
 
       await expect(orchestrator.processOrder(orderDto)).rejects.toThrow(
         'Unexpected database error',
@@ -668,9 +651,7 @@ describe('OrderOrchestrator', () => {
         items: [],
       });
 
-      mockComplianceAgent.verifyAge.mockRejectedValue(
-        new Error('Compliance check failed'),
-      );
+      mockComplianceAgent.verifyAge.mockRejectedValue(new Error('Compliance check failed'));
 
       // Release also fails
       mockInventoryAgent.release.mockRejectedValue(new Error('Release failed'));

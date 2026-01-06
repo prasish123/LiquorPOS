@@ -13,13 +13,7 @@ describe('Order Integration Tests', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OrdersService,
-        InventoryService,
-        CustomersService,
-        PrismaService,
-        EventEmitter2,
-      ],
+      providers: [OrdersService, InventoryService, CustomersService, PrismaService, EventEmitter2],
     }).compile();
 
     ordersService = module.get<OrdersService>(OrdersService);
@@ -171,9 +165,7 @@ describe('Order Integration Tests', () => {
 
       // Verify item is in low stock list
       expect(lowStockItems.length).toBeGreaterThan(0);
-      expect(lowStockItems.some((item) => item.productId === product.id)).toBe(
-        true,
-      );
+      expect(lowStockItems.some((item) => item.productId === product.id)).toBe(true);
 
       // Cleanup
       await prisma.inventory.deleteMany({ where: { productId: product.id } });

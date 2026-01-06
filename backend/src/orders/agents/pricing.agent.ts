@@ -30,10 +30,7 @@ export class PricingAgent {
    * @param items - Order items to price
    * @param locationId - Location ID for tax rate lookup (optional)
    */
-  async calculate(
-    items: OrderItemDto[],
-    locationId?: string,
-  ): Promise<PricingResult> {
+  async calculate(items: OrderItemDto[], locationId?: string): Promise<PricingResult> {
     // Get location-specific tax rate
     const taxRate = await this.getTaxRate(locationId);
 

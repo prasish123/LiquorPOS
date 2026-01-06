@@ -15,10 +15,6 @@ import { OrdersModule } from '../orders/orders.module';
     DeliveryPlatformTransformerService,
     PrismaService,
   ],
-  exports: [
-    WebhooksService,
-    StripeWebhookService,
-    DeliveryPlatformTransformerService,
-  ],
+  exports: [WebhooksService, StripeWebhookService, DeliveryPlatformTransformerService],
 })
 export class WebhooksModule {}

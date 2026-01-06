@@ -221,9 +221,7 @@ describe('CustomersService', () => {
     it('should silently fail if customer not found', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.updateLifetimeValue('cust-999', 50.0),
-      ).resolves.not.toThrow();
+      await expect(service.updateLifetimeValue('cust-999', 50.0)).resolves.not.toThrow();
     });
   });
 

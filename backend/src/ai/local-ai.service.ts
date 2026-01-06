@@ -14,10 +14,7 @@ export class LocalAIService implements OnModuleInit {
       // Use the same model as ContextIQ (or similar efficient one)
       // 'feature-extraction' task returns the embedding
       this.logger.log('Loading model: Xenova/all-MiniLM-L6-v2...');
-      this.pipe = await pipeline(
-        'feature-extraction',
-        'Xenova/all-MiniLM-L6-v2',
-      );
+      this.pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
       this.logger.log('Local AI Model loaded successfully.');
     } catch (error) {
       this.logger.error('Failed to load Local AI model:', error);
@@ -28,15 +25,12 @@ export class LocalAIService implements OnModuleInit {
     if (!this.pipe) {
       this.logger.warn('Model not loaded yet, attempting to lazy load...');
       const { pipeline } = await import('@xenova/transformers');
-      this.pipe = await pipeline(
-        'feature-extraction',
-        'Xenova/all-MiniLM-L6-v2',
-      );
+      this.pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
     }
 
     // Generate embedding
     // pooling: 'mean' and normalize: true are standard for semantic search
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+
     const output = (await this.pipe(text, {
       pooling: 'mean',
       normalize: true,

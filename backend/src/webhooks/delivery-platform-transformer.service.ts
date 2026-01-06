@@ -31,9 +31,7 @@ export class DeliveryPlatformTransformerService {
   /**
    * Transform Uber Eats webhook payload to CreateOrderDto
    */
-  async transformUberEatsOrder(
-    payload: UberEatsWebhookDto,
-  ): Promise<CreateOrderDto> {
+  async transformUberEatsOrder(payload: UberEatsWebhookDto): Promise<CreateOrderDto> {
     this.logger.log(`Transforming Uber Eats order: ${payload.order_id}`);
 
     // Only process 'created' status orders
@@ -44,10 +42,7 @@ export class DeliveryPlatformTransformerService {
     }
 
     // Map store ID to location ID
-    const locationId = await this.mapStoreToLocation(
-      'uber_eats',
-      payload.store_id,
-    );
+    const locationId = await this.mapStoreToLocation('uber_eats', payload.store_id);
 
     // Transform items
     const items: OrderItemDto[] = payload.items.map((item) => ({
@@ -99,9 +94,7 @@ export class DeliveryPlatformTransformerService {
       idempotencyKey,
     };
 
-    this.logger.log(
-      `Transformed Uber Eats order ${payload.order_id} → ${idempotencyKey}`,
-    );
+    this.logger.log(`Transformed Uber Eats order ${payload.order_id} → ${idempotencyKey}`);
 
     return createOrderDto;
   }
@@ -109,23 +102,16 @@ export class DeliveryPlatformTransformerService {
   /**
    * Transform DoorDash webhook payload to CreateOrderDto
    */
-  async transformDoorDashOrder(
-    payload: DoorDashWebhookDto,
-  ): Promise<CreateOrderDto> {
+  async transformDoorDashOrder(payload: DoorDashWebhookDto): Promise<CreateOrderDto> {
     this.logger.log(`Transforming DoorDash order: ${payload.order_id}`);
 
     // Only process 'created' status orders
     if (payload.status !== 'created') {
-      throw new BadRequestException(
-        `Cannot process DoorDash order with status: ${payload.status}`,
-      );
+      throw new BadRequestException(`Cannot process DoorDash order with status: ${payload.status}`);
     }
 
     // Map store ID to location ID
-    const locationId = await this.mapStoreToLocation(
-      'doordash',
-      payload.store_id,
-    );
+    const locationId = await this.mapStoreToLocation('doordash', payload.store_id);
 
     // Transform items
     const items: OrderItemDto[] = payload.items.map((item) => ({
@@ -177,9 +163,7 @@ export class DeliveryPlatformTransformerService {
       idempotencyKey,
     };
 
-    this.logger.log(
-      `Transformed DoorDash order ${payload.order_id} → ${idempotencyKey}`,
-    );
+    this.logger.log(`Transformed DoorDash order ${payload.order_id} → ${idempotencyKey}`);
 
     return createOrderDto;
   }
@@ -206,9 +190,7 @@ export class DeliveryPlatformTransformerService {
       });
 
       if (location) {
-        this.logger.debug(
-          `Mapped ${platform} store ${storeId} → location ${location.id}`,
-        );
+        this.logger.debug(`Mapped ${platform} store ${storeId} → location ${location.id}`);
         return location.id;
       }
 
@@ -256,4 +238,3 @@ export class DeliveryPlatformTransformerService {
     return `${platform}:${eventId}:${orderId}`;
   }
 }
-

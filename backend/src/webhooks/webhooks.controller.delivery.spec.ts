@@ -28,7 +28,7 @@ describe('WebhooksController - Delivery Platforms', () => {
     paymentMethod: 'card',
     channel: 'uber_eats',
     subtotal: 19.99,
-    tax: 1.40,
+    tax: 1.4,
     total: 21.39,
     ageVerified: true,
     ageVerifiedBy: 'Uber Eats Platform',
@@ -43,7 +43,7 @@ describe('WebhooksController - Delivery Platforms', () => {
     employeeId: undefined,
     customerId: undefined,
     subtotal: 19.99,
-    tax: 1.40,
+    tax: 1.4,
     discount: 0,
     total: 21.39,
     paymentMethod: 'card',
@@ -121,20 +121,13 @@ describe('WebhooksController - Delivery Platforms', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      jest
-        .spyOn(webhooksService, 'storeWebhookEvent')
-        .mockResolvedValue('event-123');
+      jest.spyOn(webhooksService, 'storeWebhookEvent').mockResolvedValue('event-123');
       jest
         .spyOn(deliveryTransformer, 'transformUberEatsOrder')
         .mockResolvedValue(mockCreateOrderDto);
-      jest
-        .spyOn(orderOrchestrator, 'processOrder')
-        .mockResolvedValue(mockOrderResponse);
+      jest.spyOn(orderOrchestrator, 'processOrder').mockResolvedValue(mockOrderResponse);
 
-      const result = await controller.handleUberEatsWebhook(
-        'test-signature',
-        payload,
-      );
+      const result = await controller.handleUberEatsWebhook('test-signature', payload);
 
       expect(result).toEqual({
         received: true,
@@ -148,18 +141,11 @@ describe('WebhooksController - Delivery Platforms', () => {
         payload,
       );
 
-      expect(deliveryTransformer.transformUberEatsOrder).toHaveBeenCalledWith(
-        payload,
-      );
+      expect(deliveryTransformer.transformUberEatsOrder).toHaveBeenCalledWith(payload);
 
-      expect(orderOrchestrator.processOrder).toHaveBeenCalledWith(
-        mockCreateOrderDto,
-      );
+      expect(orderOrchestrator.processOrder).toHaveBeenCalledWith(mockCreateOrderDto);
 
-      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event-123',
-        true,
-      );
+      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith('event-123', true);
     });
 
     it('should skip non-created status orders', async () => {
@@ -183,14 +169,9 @@ describe('WebhooksController - Delivery Platforms', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      jest
-        .spyOn(webhooksService, 'storeWebhookEvent')
-        .mockResolvedValue('event-123');
+      jest.spyOn(webhooksService, 'storeWebhookEvent').mockResolvedValue('event-123');
 
-      const result = await controller.handleUberEatsWebhook(
-        'test-signature',
-        payload,
-      );
+      const result = await controller.handleUberEatsWebhook('test-signature', payload);
 
       expect(result).toEqual({
         received: true,
@@ -198,10 +179,7 @@ describe('WebhooksController - Delivery Platforms', () => {
 
       expect(deliveryTransformer.transformUberEatsOrder).not.toHaveBeenCalled();
       expect(orderOrchestrator.processOrder).not.toHaveBeenCalled();
-      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event-123',
-        true,
-      );
+      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith('event-123', true);
     });
 
     it('should handle transformation errors', async () => {
@@ -225,16 +203,14 @@ describe('WebhooksController - Delivery Platforms', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      jest
-        .spyOn(webhooksService, 'storeWebhookEvent')
-        .mockResolvedValue('event-123');
+      jest.spyOn(webhooksService, 'storeWebhookEvent').mockResolvedValue('event-123');
       jest
         .spyOn(deliveryTransformer, 'transformUberEatsOrder')
         .mockRejectedValue(new BadRequestException('Transformation failed'));
 
-      await expect(
-        controller.handleUberEatsWebhook('test-signature', payload),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.handleUberEatsWebhook('test-signature', payload)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -269,20 +245,13 @@ describe('WebhooksController - Delivery Platforms', () => {
         idempotencyKey: 'doordash:evt_123:order_456',
       };
 
-      jest
-        .spyOn(webhooksService, 'storeWebhookEvent')
-        .mockResolvedValue('event-123');
-      jest
-        .spyOn(deliveryTransformer, 'transformDoorDashOrder')
-        .mockResolvedValue(doorDashOrderDto);
+      jest.spyOn(webhooksService, 'storeWebhookEvent').mockResolvedValue('event-123');
+      jest.spyOn(deliveryTransformer, 'transformDoorDashOrder').mockResolvedValue(doorDashOrderDto);
       jest
         .spyOn(orderOrchestrator, 'processOrder')
         .mockResolvedValue({ ...mockOrderResponse, channel: 'doordash' });
 
-      const result = await controller.handleDoorDashWebhook(
-        'test-signature',
-        payload,
-      );
+      const result = await controller.handleDoorDashWebhook('test-signature', payload);
 
       expect(result).toEqual({
         received: true,
@@ -296,18 +265,11 @@ describe('WebhooksController - Delivery Platforms', () => {
         payload,
       );
 
-      expect(deliveryTransformer.transformDoorDashOrder).toHaveBeenCalledWith(
-        payload,
-      );
+      expect(deliveryTransformer.transformDoorDashOrder).toHaveBeenCalledWith(payload);
 
-      expect(orderOrchestrator.processOrder).toHaveBeenCalledWith(
-        doorDashOrderDto,
-      );
+      expect(orderOrchestrator.processOrder).toHaveBeenCalledWith(doorDashOrderDto);
 
-      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event-123',
-        true,
-      );
+      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith('event-123', true);
     });
 
     it('should skip non-created status orders', async () => {
@@ -333,14 +295,9 @@ describe('WebhooksController - Delivery Platforms', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      jest
-        .spyOn(webhooksService, 'storeWebhookEvent')
-        .mockResolvedValue('event-123');
+      jest.spyOn(webhooksService, 'storeWebhookEvent').mockResolvedValue('event-123');
 
-      const result = await controller.handleDoorDashWebhook(
-        'test-signature',
-        payload,
-      );
+      const result = await controller.handleDoorDashWebhook('test-signature', payload);
 
       expect(result).toEqual({
         received: true,
@@ -348,10 +305,7 @@ describe('WebhooksController - Delivery Platforms', () => {
 
       expect(deliveryTransformer.transformDoorDashOrder).not.toHaveBeenCalled();
       expect(orderOrchestrator.processOrder).not.toHaveBeenCalled();
-      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event-123',
-        true,
-      );
+      expect(webhooksService.markEventProcessed).toHaveBeenCalledWith('event-123', true);
     });
 
     it('should handle order processing errors', async () => {
@@ -377,9 +331,7 @@ describe('WebhooksController - Delivery Platforms', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      jest
-        .spyOn(webhooksService, 'storeWebhookEvent')
-        .mockResolvedValue('event-123');
+      jest.spyOn(webhooksService, 'storeWebhookEvent').mockResolvedValue('event-123');
       jest
         .spyOn(deliveryTransformer, 'transformDoorDashOrder')
         .mockResolvedValue(mockCreateOrderDto);
@@ -387,9 +339,9 @@ describe('WebhooksController - Delivery Platforms', () => {
         .spyOn(orderOrchestrator, 'processOrder')
         .mockRejectedValue(new Error('Order processing failed'));
 
-      await expect(
-        controller.handleDoorDashWebhook('test-signature', payload),
-      ).rejects.toThrow('Order processing failed');
+      await expect(controller.handleDoorDashWebhook('test-signature', payload)).rejects.toThrow(
+        'Order processing failed',
+      );
     });
   });
 
@@ -420,13 +372,12 @@ describe('WebhooksController - Delivery Platforms', () => {
         .spyOn(webhooksService, 'storeWebhookEvent')
         .mockRejectedValue(new BadRequestException('Event already processed'));
 
-      await expect(
-        controller.handleUberEatsWebhook('test-signature', payload),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.handleUberEatsWebhook('test-signature', payload)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(deliveryTransformer.transformUberEatsOrder).not.toHaveBeenCalled();
       expect(orderOrchestrator.processOrder).not.toHaveBeenCalled();
     });
   });
 });
-

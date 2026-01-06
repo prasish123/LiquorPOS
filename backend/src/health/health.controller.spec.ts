@@ -76,12 +76,8 @@ describe('HealthController', () => {
     healthCheckService = module.get<HealthCheckService>(HealthCheckService);
     prismaHealth = module.get<PrismaHealthIndicator>(PrismaHealthIndicator);
     redisHealth = module.get<RedisHealthIndicator>(RedisHealthIndicator);
-    conexxusHealth = module.get<ConexxusHealthIndicator>(
-      ConexxusHealthIndicator,
-    );
-    encryptionHealth = module.get<EncryptionHealthIndicator>(
-      EncryptionHealthIndicator,
-    );
+    conexxusHealth = module.get<ConexxusHealthIndicator>(ConexxusHealthIndicator);
+    encryptionHealth = module.get<EncryptionHealthIndicator>(EncryptionHealthIndicator);
   });
 
   it('should be defined', () => {
@@ -102,9 +98,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.check();
 
@@ -113,9 +107,7 @@ describe('HealthController', () => {
     });
 
     it('should handle Redis failure gracefully', async () => {
-      jest
-        .spyOn(redisHealth, 'isHealthy')
-        .mockRejectedValue(new Error('Redis down'));
+      jest.spyOn(redisHealth, 'isHealthy').mockRejectedValue(new Error('Redis down'));
 
       const mockResult = {
         status: 'ok',
@@ -127,9 +119,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.check();
 
@@ -137,9 +127,7 @@ describe('HealthController', () => {
     });
 
     it('should handle Conexxus failure gracefully', async () => {
-      jest
-        .spyOn(conexxusHealth, 'isHealthy')
-        .mockRejectedValue(new Error('Conexxus down'));
+      jest.spyOn(conexxusHealth, 'isHealthy').mockRejectedValue(new Error('Conexxus down'));
 
       const mockResult = {
         status: 'ok',
@@ -151,9 +139,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.check();
 
@@ -175,9 +161,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.checkLiveness();
 
@@ -196,9 +180,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       await controller.checkLiveness();
 
@@ -218,9 +200,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.checkReadiness();
 
@@ -228,9 +208,7 @@ describe('HealthController', () => {
     });
 
     it('should be ready even if Redis is down', async () => {
-      jest
-        .spyOn(redisHealth, 'isHealthy')
-        .mockRejectedValue(new Error('Redis down'));
+      jest.spyOn(redisHealth, 'isHealthy').mockRejectedValue(new Error('Redis down'));
 
       const mockResult = {
         status: 'ok',
@@ -243,9 +221,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.checkReadiness();
 
@@ -253,9 +229,7 @@ describe('HealthController', () => {
     });
 
     it('should be ready even if Conexxus is down', async () => {
-      jest
-        .spyOn(conexxusHealth, 'isHealthy')
-        .mockRejectedValue(new Error('Conexxus down'));
+      jest.spyOn(conexxusHealth, 'isHealthy').mockRejectedValue(new Error('Conexxus down'));
 
       const mockResult = {
         status: 'ok',
@@ -268,9 +242,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.checkReadiness();
 
@@ -278,9 +250,7 @@ describe('HealthController', () => {
     });
 
     it('should fail if database is down', async () => {
-      jest
-        .spyOn(prismaHealth, 'pingCheck')
-        .mockRejectedValue(new Error('Database down'));
+      jest.spyOn(prismaHealth, 'pingCheck').mockRejectedValue(new Error('Database down'));
 
       const mockResult = {
         status: 'error',
@@ -291,9 +261,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.checkReadiness();
 
@@ -301,9 +269,7 @@ describe('HealthController', () => {
     });
 
     it('should fail if encryption is broken', async () => {
-      jest
-        .spyOn(encryptionHealth, 'isHealthy')
-        .mockRejectedValue(new Error('Encryption broken'));
+      jest.spyOn(encryptionHealth, 'isHealthy').mockRejectedValue(new Error('Encryption broken'));
 
       const mockResult = {
         status: 'error',
@@ -314,9 +280,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(healthCheckService, 'check')
-        .mockResolvedValue(mockResult as any);
+      jest.spyOn(healthCheckService, 'check').mockResolvedValue(mockResult as any);
 
       const result = await controller.checkReadiness();
 
@@ -335,9 +299,7 @@ describe('HealthController', () => {
         details: {},
       };
 
-      jest
-        .spyOn(controller, 'check')
-        .mockResolvedValue(mockHealthResult as any);
+      jest.spyOn(controller, 'check').mockResolvedValue(mockHealthResult as any);
 
       const result = await controller.getDetails();
 
@@ -349,9 +311,7 @@ describe('HealthController', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      jest
-        .spyOn(controller, 'check')
-        .mockRejectedValue(new Error('Health check failed'));
+      jest.spyOn(controller, 'check').mockRejectedValue(new Error('Health check failed'));
 
       const result = await controller.getDetails();
 

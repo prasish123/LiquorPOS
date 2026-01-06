@@ -22,9 +22,7 @@ describe('EncryptionHealthIndicator', () => {
       ],
     }).compile();
 
-    indicator = module.get<EncryptionHealthIndicator>(
-      EncryptionHealthIndicator,
-    );
+    indicator = module.get<EncryptionHealthIndicator>(EncryptionHealthIndicator);
     encryptionService = module.get<EncryptionService>(EncryptionService);
   });
 
@@ -34,15 +32,9 @@ describe('EncryptionHealthIndicator', () => {
 
   describe('isHealthy()', () => {
     it('should return healthy status when encryption works', async () => {
-      jest
-        .spyOn(encryptionService, 'encrypt')
-        .mockReturnValue('encrypted-data');
-      jest
-        .spyOn(encryptionService, 'decrypt')
-        .mockReturnValue('health-check-test');
-      jest
-        .spyOn(encryptionService, 'isKeyRotationActive')
-        .mockReturnValue(false);
+      jest.spyOn(encryptionService, 'encrypt').mockReturnValue('encrypted-data');
+      jest.spyOn(encryptionService, 'decrypt').mockReturnValue('health-check-test');
+      jest.spyOn(encryptionService, 'isKeyRotationActive').mockReturnValue(false);
 
       const result = await indicator.isHealthy('encryption');
 
@@ -57,15 +49,9 @@ describe('EncryptionHealthIndicator', () => {
     });
 
     it('should include key rotation status', async () => {
-      jest
-        .spyOn(encryptionService, 'encrypt')
-        .mockReturnValue('encrypted-data');
-      jest
-        .spyOn(encryptionService, 'decrypt')
-        .mockReturnValue('health-check-test');
-      jest
-        .spyOn(encryptionService, 'isKeyRotationActive')
-        .mockReturnValue(true);
+      jest.spyOn(encryptionService, 'encrypt').mockReturnValue('encrypted-data');
+      jest.spyOn(encryptionService, 'decrypt').mockReturnValue('health-check-test');
+      jest.spyOn(encryptionService, 'isKeyRotationActive').mockReturnValue(true);
 
       const result = await indicator.isHealthy('encryption');
 
@@ -77,20 +63,14 @@ describe('EncryptionHealthIndicator', () => {
     it('should throw HealthCheckError when encryption returns null', async () => {
       jest.spyOn(encryptionService, 'encrypt').mockReturnValue(null as any);
 
-      await expect(indicator.isHealthy('encryption')).rejects.toThrow(
-        HealthCheckError,
-      );
+      await expect(indicator.isHealthy('encryption')).rejects.toThrow(HealthCheckError);
     });
 
     it('should throw HealthCheckError when decryption fails', async () => {
-      jest
-        .spyOn(encryptionService, 'encrypt')
-        .mockReturnValue('encrypted-data');
+      jest.spyOn(encryptionService, 'encrypt').mockReturnValue('encrypted-data');
       jest.spyOn(encryptionService, 'decrypt').mockReturnValue('wrong-data');
 
-      await expect(indicator.isHealthy('encryption')).rejects.toThrow(
-        HealthCheckError,
-      );
+      await expect(indicator.isHealthy('encryption')).rejects.toThrow(HealthCheckError);
     });
 
     it('should throw HealthCheckError when encryption throws error', async () => {
@@ -98,9 +78,7 @@ describe('EncryptionHealthIndicator', () => {
         throw new Error('Encryption key not found');
       });
 
-      await expect(indicator.isHealthy('encryption')).rejects.toThrow(
-        HealthCheckError,
-      );
+      await expect(indicator.isHealthy('encryption')).rejects.toThrow(HealthCheckError);
     });
 
     it('should include error message in result when check fails', async () => {

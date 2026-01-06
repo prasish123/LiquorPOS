@@ -22,11 +22,6 @@ import { CommonModule } from '../common/common.module';
     NetworkStatusService,
     PrismaService,
   ],
-  exports: [
-    PaymentRouterService,
-    PaxTerminalAgent,
-    TerminalManagerService,
-  ],
+  exports: [PaymentRouterService, PaxTerminalAgent, TerminalManagerService],
 })
 export class PaymentsModule {}
-

@@ -1,0 +1,575 @@
+{
+  "info": {
+    "name": "Florida Liquor Store POS API",
+    "description": "Complete API collection for testing the POS system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "12345678"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{AUTH_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "AUTH_TOKEN",
+      "value": "your-jwt-token-here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/health",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Readiness Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/health/readiness",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "health", "readiness"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/monitoring/metrics",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "monitoring", "metrics"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order - Cash Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Order created successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.status).to.eql('completed');",
+                  "    pm.environment.set(\"ORDER_ID\", jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"loc-1\",\n  \"terminalId\": \"term-1\",\n  \"employeeId\": \"emp-1\",\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"quantity\": 2,\n      \"unitPrice\": 19.99\n    },\n    {\n      \"productId\": \"prod-2\",\n      \"quantity\": 1,\n      \"unitPrice\": 29.99\n    }\n  ],\n  \"paymentMethod\": \"cash\",\n  \"amountTendered\": 100.00\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Order - Card (Stripe)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Payment processed via Stripe\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.paymentMethod).to.eql('card');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"loc-1\",\n  \"terminalId\": \"term-1\",\n  \"employeeId\": \"emp-1\",\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"quantity\": 1,\n      \"unitPrice\": 49.99\n    }\n  ],\n  \"paymentMethod\": \"card\",\n  \"cardDetails\": {\n    \"last4\": \"4242\",\n    \"brand\": \"visa\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Order - Card (PAX Terminal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"loc-1\",\n  \"terminalId\": \"term-pax-1\",\n  \"employeeId\": \"emp-1\",\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"quantity\": 1,\n      \"unitPrice\": 49.99\n    }\n  ],\n  \"paymentMethod\": \"card\",\n  \"preferredProcessor\": \"pax\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/{{ORDER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "{{ORDER_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Orders (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders?page=1&limit=10&locationId=loc-1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "locationId",
+                  "value": "loc-1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Daily Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/daily-summary?date=2026-01-05&locationId=loc-1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "daily-summary"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-01-05"
+                },
+                {
+                  "key": "locationId",
+                  "value": "loc-1"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Orders by Date Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/orders/date-range?startDate=2026-01-01&endDate=2026-01-05&locationId=loc-1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "orders", "date-range"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-01-05"
+                },
+                {
+                  "key": "locationId",
+                  "value": "loc-1"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Receipts",
+      "item": [
+        {
+          "name": "Generate Receipt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Receipt generated\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('content');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/receipts/generate/{{ORDER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "receipts", "generate", "{{ORDER_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Receipt HTML",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/receipts/html/{{ORDER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "receipts", "html", "{{ORDER_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reprint Receipt",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/receipts/reprint/{{ORDER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "receipts", "reprint", "{{ORDER_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Authorize Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00,\n  \"paymentMethod\": \"card\",\n  \"transactionId\": \"txn-123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/payments/authorize",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "payments", "authorize"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Capture Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentIntentId\": \"pi_123\",\n  \"amount\": 100.00\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/payments/capture",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "payments", "capture"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Void Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentIntentId\": \"pi_123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/payments/void",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "payments", "void"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentIntentId\": \"pi_123\",\n  \"amount\": 50.00,\n  \"reason\": \"Customer request\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/payments/refund",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "payments", "refund"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/payments/status/pi_123",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "payments", "status", "pi_123"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "Get Product Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/product/prod-1",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "inventory", "product", "prod-1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reserve Inventory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"quantity\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/reserve",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "inventory", "reserve"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Release Inventory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"quantity\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/release",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "inventory", "release"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Commit Inventory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"quantity\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/commit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "inventory", "commit"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Age Verification",
+      "item": [
+        {
+          "name": "Verify Age",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"cust-1\",\n  \"dateOfBirth\": \"1990-01-01\",\n  \"items\": [\n    {\n      \"productId\": \"prod-1\",\n      \"ageRestricted\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/compliance/verify-age",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "compliance", "verify-age"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Compliance Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/compliance/events?startDate=2026-01-01&endDate=2026-01-05",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "compliance", "events"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-01-05"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

@@ -52,8 +52,7 @@ describe('LoggerService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     logger = new LoggerService('TestContext');
-    mockWinstonLogger = (winston.createLogger as jest.Mock).mock.results[0]
-      .value;
+    mockWinstonLogger = (winston.createLogger as jest.Mock).mock.results[0].value;
   });
 
   describe('initialization', () => {

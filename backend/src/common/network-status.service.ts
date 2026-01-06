@@ -29,7 +29,7 @@ export interface ServiceHealthCheck {
 @Injectable()
 export class NetworkStatusService implements OnModuleInit {
   private readonly logger = new Logger(NetworkStatusService.name);
-  
+
   private status: NetworkStatus = {
     isOnline: true,
     lastCheck: new Date(),
@@ -59,13 +59,10 @@ export class NetworkStatusService implements OnModuleInit {
     },
     {
       name: 'conexxus',
-      url: process.env.CONEXXUS_API_URL
-        ? `${process.env.CONEXXUS_API_URL}/api/v1/health`
-        : '',
+      url: process.env.CONEXXUS_API_URL ? `${process.env.CONEXXUS_API_URL}/api/v1/health` : '',
       timeout: 5000,
       enabled: !!(
-        process.env.CONEXXUS_API_URL &&
-        !process.env.CONEXXUS_API_URL.includes('example.com')
+        process.env.CONEXXUS_API_URL && !process.env.CONEXXUS_API_URL.includes('example.com')
       ),
     },
   ];
@@ -84,9 +81,7 @@ export class NetworkStatusService implements OnModuleInit {
     this.logger.debug('Checking network connectivity...');
 
     const results = await Promise.allSettled(
-      this.healthChecks
-        .filter((check) => check.enabled)
-        .map((check) => this.checkService(check)),
+      this.healthChecks.filter((check) => check.enabled).map((check) => this.checkService(check)),
     );
 
     // Update service statuses
@@ -99,9 +94,7 @@ export class NetworkStatusService implements OnModuleInit {
       } else {
         this.status.services[serviceName] = false;
         if (result.status === 'rejected') {
-          this.logger.warn(
-            `Service ${serviceName} health check failed: ${result.reason}`,
-          );
+          this.logger.warn(`Service ${serviceName} health check failed: ${result.reason}`);
         }
       }
     });
@@ -157,11 +150,8 @@ export class NetworkStatusService implements OnModuleInit {
 
       return response.status < 500;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.debug(
-        `Health check failed for ${check.name}: ${errorMessage}`,
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.debug(`Health check failed for ${check.name}: ${errorMessage}`);
       return false;
     }
   }
@@ -263,4 +253,3 @@ export class NetworkStatusService implements OnModuleInit {
     return [...this.healthChecks];
   }
 }
-

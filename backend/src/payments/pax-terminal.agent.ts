@@ -74,12 +74,7 @@ class PaxProtocol {
     const message = [command, ...fields].join(String.fromCharCode(this.FS));
     const lrc = this.calculateLRC(message);
 
-    return Buffer.from([
-      this.STX,
-      ...Buffer.from(message),
-      this.ETX,
-      lrc,
-    ]);
+    return Buffer.from([this.STX, ...Buffer.from(message), this.ETX, lrc]);
   }
 
   /**
@@ -132,10 +127,10 @@ class PaxProtocol {
 
 /**
  * PAX Terminal Agent
- * 
+ *
  * Handles communication with PAX payment terminals using the PAX protocol.
  * Supports various transaction types including sale, refund, void, and auth/capture.
- * 
+ *
  * Features:
  * - Direct TCP/IP communication with PAX terminals
  * - Transaction processing (sale, refund, void, auth, capture)
@@ -143,7 +138,7 @@ class PaxProtocol {
  * - Error handling and retry logic
  * - Transaction logging and audit trail
  * - EMV and contactless support
- * 
+ *
  * PAX Terminal Models Supported:
  * - PAX A920/A920Pro (Android-based)
  * - PAX A80 (Countertop)
@@ -177,9 +172,7 @@ export class PaxTerminalAgent {
     // Test connection
     const status = await this.getTerminalStatus(config.terminalId);
     if (!status.online) {
-      this.logger.warn(
-        `PAX terminal ${config.terminalId} is registered but not online`,
-      );
+      this.logger.warn(`PAX terminal ${config.terminalId} is registered but not online`);
     }
 
     this.logger.log(`PAX terminal ${config.terminalId} registered successfully`);
@@ -263,8 +256,7 @@ export class PaxTerminalAgent {
         referenceNumber,
         amount: request.amount,
         responseCode: 'ERROR',
-        responseMessage:
-          error instanceof Error ? error.message : 'Unknown error',
+        responseMessage: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date(),
         terminalId,
       };
@@ -363,10 +355,7 @@ export class PaxTerminalAgent {
   /**
    * Build transaction command for PAX terminal
    */
-  private buildTransactionCommand(
-    request: PaxTransactionRequest,
-    referenceNumber: string,
-  ): Buffer {
+  private buildTransactionCommand(request: PaxTransactionRequest, referenceNumber: string): Buffer {
     // Convert amount to cents (PAX expects integer amount in cents)
     const amountInCents = Math.round(request.amount * 100).toString();
 
@@ -462,10 +451,8 @@ export class PaxTerminalAgent {
       const client = new net.Socket();
 
       let responseBuffer = Buffer.alloc(0);
-      let timeoutHandle: NodeJS.Timeout;
-
       // Set timeout
-      timeoutHandle = setTimeout(() => {
+      const timeoutHandle: NodeJS.Timeout = setTimeout(() => {
         client.destroy();
         reject(new Error(`Terminal ${terminalId} timeout after ${timeout}ms`));
       }, timeout);
@@ -493,10 +480,7 @@ export class PaxTerminalAgent {
       // Handle errors
       client.on('error', (error: Error) => {
         clearTimeout(timeoutHandle);
-        this.logger.error(
-          `Terminal ${terminalId} connection error`,
-          error.stack,
-        );
+        this.logger.error(`Terminal ${terminalId} connection error`, error.stack);
         reject(error);
       });
 
@@ -601,4 +585,3 @@ export class PaxTerminalAgent {
     }
   }
 }
-

@@ -151,9 +151,7 @@ export class ReportingService {
     const products = await this.prisma.product.findMany({
       where: { sku: { in: skus } },
       include: {
-        inventory: query.locationId
-          ? { where: { locationId: query.locationId } }
-          : true,
+        inventory: query.locationId ? { where: { locationId: query.locationId } } : true,
       },
     });
 
@@ -164,8 +162,10 @@ export class ReportingService {
     const topProducts: ProductPerformanceDto[] = Array.from(skuMap.entries())
       .map(([sku, data]) => {
         const product = productBySku.get(sku);
-        const averagePrice = data.prices.reduce((a: number, b: number) => a + b, 0) / data.prices.length;
-        const currentStock = product?.inventory.reduce((sum: number, inv: any) => sum + inv.quantity, 0) || 0;
+        const averagePrice =
+          data.prices.reduce((a: number, b: number) => a + b, 0) / data.prices.length;
+        const currentStock =
+          product?.inventory.reduce((sum: number, inv: any) => sum + inv.quantity, 0) || 0;
         const profitMargin = 0; // TODO: Calculate from product cost
 
         // Calculate turnover rate (units sold / average stock)
@@ -325,9 +325,7 @@ export class ReportingService {
   /**
    * Generate employee performance report
    */
-  async getEmployeePerformance(
-    query: EmployeeReportQueryDto,
-  ): Promise<EmployeePerformanceDto[]> {
+  async getEmployeePerformance(query: EmployeeReportQueryDto): Promise<EmployeePerformanceDto[]> {
     const startDate = new Date(query.startDate);
     const endDate = new Date(query.endDate);
 
@@ -384,7 +382,10 @@ export class ReportingService {
       const averageTransactionValue = totalRevenue / transactionsProcessed;
 
       // Calculate hours worked (simplified - assumes 8 hour days)
-      const daysDiff = Math.max(1, (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.max(
+        1,
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
       const hoursWorked = Math.min(daysDiff * 8, 160); // Cap at 160 hours/month
 
       performance.push({
@@ -508,4 +509,3 @@ export class ReportingService {
       .slice(0, 10);
   }
 }
-

@@ -161,4 +161,3 @@ export class XeroService implements AccountingIntegration {
     };
   }
 }
-

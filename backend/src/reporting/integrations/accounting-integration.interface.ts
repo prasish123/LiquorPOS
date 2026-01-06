@@ -120,4 +120,3 @@ export interface SyncStatus {
   pendingRecords: number;
   errorMessage?: string;
 }
-

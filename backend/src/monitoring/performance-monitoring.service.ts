@@ -117,11 +117,7 @@ export class PerformanceMonitoringService {
   /**
    * Track a custom operation's performance
    */
-  trackCustomMetric(
-    name: string,
-    duration: number,
-    metadata?: Record<string, any>,
-  ): void {
+  trackCustomMetric(name: string, duration: number, metadata?: Record<string, any>): void {
     const metric: PerformanceMetric = {
       name,
       duration,
@@ -180,9 +176,7 @@ export class PerformanceMonitoringService {
       };
     }
 
-    const durations = this.requestMetrics
-      .map((m) => m.duration)
-      .sort((a, b) => a - b);
+    const durations = this.requestMetrics.map((m) => m.duration).sort((a, b) => a - b);
     const total = this.requestMetrics.length;
     const sum = durations.reduce((acc, d) => acc + d, 0);
 

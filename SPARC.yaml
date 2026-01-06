@@ -1,0 +1,1359 @@
+# ==============================================================================
+# SPARC - Liquor POS System
+# ==============================================================================
+# Specification and Architecture from Observed Reality
+# Generated: 2026-01-05
+# Source: observed_system.yaml, observed_flows.yaml, observed_non_functional.yaml
+# ==============================================================================
+
+meta:
+  system_name: Liquor POS
+  version: "1.0.0"
+  description: Point-of-sale system for Florida liquor stores with offline-first architecture
+  domain: Retail / Liquor Store Operations
+  compliance:
+    - Florida liquor laws (21+ age verification)
+    - Payment Card Industry Data Security Standard (PCI DSS) - via Stripe
+    - Audit trail requirements (immutable logs)
+  
+  technology_stack:
+    backend:
+      runtime: Node.js 22+
+      framework: NestJS
+      language: TypeScript
+      orm: Prisma 7
+      database_adapter: "@prisma/adapter-pg"
+    
+    frontend:
+      framework: React
+      build_tool: Vite
+      language: TypeScript
+      state_management: Zustand
+      routing: React Router
+      offline_storage: SQLite (IndexedDB via OPFS)
+    
+    infrastructure:
+      database: PostgreSQL 16
+      cache: Redis 7
+      payment_processor: Stripe (API version 2025-12-15.clover)
+      container_runtime: Docker
+      orchestration: Docker Compose
+      web_server: Nginx (frontend)
+    
+    integrations:
+      - Stripe Payment API
+      - PAX Payment Terminals
+      - Uber Eats Webhooks
+      - DoorDash Webhooks
+      - OpenAI API (optional, for semantic search)
+      - Sentry (optional, error tracking)
+      - Grafana Loki (optional, log aggregation)
+  
+  deployment_model:
+    primary: Docker Compose (single-host)
+    kubernetes_ready: true (health probes implemented)
+    scaling: Single-instance (no built-in clustering)
+    confidence: high
+  
+  operational_characteristics:
+    startup_time: ~60 seconds (with health checks)
+    availability_target: 99.9% (inferred)
+    confidence: low
+    rto: Manual (no automatic failover)
+    rpo: 24 hours (daily backups at 2 AM)
+    business_hours: "8 AM - 10 PM" (hardcoded for alerts)
+
+# ==============================================================================
+# DOMAINS
+# ==============================================================================
+domains:
+  
+  - name: Authentication & Authorization
+    description: User identity management, session handling, role-based access control
+    entities:
+      - User:
+          fields:
+            - id: UUID (primary key)
+            - username: string (unique)
+            - password: string (bcrypt hashed)
+            - pin: string (optional, 4-6 digits, hashed)
+            - firstName: string
+            - lastName: string
+            - role: enum (ADMIN, MANAGER, CASHIER)
+            - active: boolean (default true)
+            - createdAt: timestamp
+            - updatedAt: timestamp
+          invariants:
+            - Password must be bcrypt hashed (10 salt rounds)
+            - PIN must be hashed if present
+            - Username must be unique
+            - Role determines access permissions
+    
+    capabilities:
+      - Login (username/password)
+      - Logout (JWT revocation)
+      - Session validation
+      - PIN authentication (for price overrides)
+      - Role-based authorization
+      - JWT token management (8-hour expiry)
+    
+    security:
+      - CSRF protection (double submit cookie pattern)
+      - JWT in HttpOnly cookies
+      - Token blacklist in Redis
+      - Rate limiting (5 attempts per 60 seconds for login)
+      - Bcrypt password hashing (10 rounds)
+    
+    confidence: high
+  
+  - name: Product Catalog
+    description: Product information, pricing, inventory tracking
+    entities:
+      - Product:
+          fields:
+            - id: UUID
+            - sku: string (unique)
+            - upc: string (optional, unique)
+            - name: string
+            - description: string (optional)
+            - category: string (wine, beer, spirits, mixers, snacks)
+            - abv: float (optional, alcohol by volume)
+            - volumeMl: integer (optional)
+            - caseSize: integer (optional)
+            - basePrice: float
+            - cost: float (for margin tracking)
+            - trackInventory: boolean (default true)
+            - ageRestricted: boolean (default false)
+            - searchText: string (optional, for search indexing)
+            - embedding: string (optional, JSON vector for AI search)
+            - createdAt: timestamp
+            - updatedAt: timestamp
+      
+      - ProductImage:
+          fields:
+            - id: UUID
+            - productId: UUID (foreign key)
+            - url: string
+            - isPrimary: boolean
+      
+      - Inventory:
+          fields:
+            - id: UUID
+            - productId: UUID (foreign key)
+            - locationId: UUID (foreign key)
+            - quantity: integer (current stock)
+            - reserved: integer (reserved for orders, default 0)
+            - reorderPoint: integer (optional, alert threshold)
+            - updatedAt: timestamp
+          constraints:
+            - unique(productId, locationId)
+    
+    capabilities:
+      - Product search (text-based, ILIKE query)
+      - AI-powered semantic search (OpenAI embeddings)
+      - Category filtering
+      - SKU/UPC lookup
+      - Low stock alerts
+      - Inventory reservation (with row-level locking)
+      - Inventory adjustment (with reason tracking)
+    
+    confidence: high
+  
+  - name: Order Processing
+    description: Transaction management, cart operations, checkout flow
+    entities:
+      - Transaction:
+          fields:
+            - id: UUID
+            - locationId: UUID (foreign key)
+            - terminalId: string (optional)
+            - employeeId: string (optional)
+            - customerId: UUID (optional, foreign key)
+            - subtotal: float
+            - tax: float
+            - discount: float (default 0)
+            - total: float
+            - paymentMethod: string (cash, card, split)
+            - paymentStatus: string (completed, refunded, partial_refund)
+            - channel: string (counter, web, uber_eats, doordash)
+            - ageVerified: boolean (default false)
+            - ageVerifiedBy: string (optional)
+            - idScanned: boolean (default false)
+            - syncedToCloud: boolean (default false)
+            - syncedToBackOffice: boolean (default false)
+            - idempotencyKey: string (optional, unique)
+            - createdAt: timestamp
+          invariants:
+            - idempotencyKey must be unique if present
+            - ageVerified must be true if any item is age-restricted
+            - total = subtotal + tax - discount
+      
+      - TransactionItem:
+          fields:
+            - id: UUID
+            - transactionId: UUID (foreign key, cascade delete)
+            - sku: string
+            - name: string
+            - quantity: integer
+            - unitPrice: float
+            - discount: float (default 0)
+            - tax: float
+            - total: float
+            - originalPrice: float (optional, if overridden)
+            - priceOverridden: boolean (default false)
+      
+      - Payment:
+          fields:
+            - id: UUID
+            - transactionId: UUID (foreign key, cascade delete)
+            - method: string (cash, card, gift_card)
+            - amount: float
+            - cardType: string (optional: visa, mastercard, amex)
+            - last4: string (optional)
+            - processorId: string (optional, Stripe payment intent ID)
+            - status: string (authorized, captured, failed)
+            - createdAt: timestamp
+    
+    capabilities:
+      - Cart management (add, remove, update quantity)
+      - Price calculation (subtotal, tax, total)
+      - Age verification enforcement
+      - Idempotent order creation
+      - Payment processing (cash, card)
+      - Offline payment queueing
+      - Order history retrieval
+      - Daily sales summary
+    
+    orchestration:
+      pattern: SAGA
+      steps:
+        1. Inventory reservation (with rollback)
+        2. Pricing calculation
+        3. Compliance verification (age check)
+        4. Payment authorization
+        5. Transaction creation
+        6. Event emission
+      compensation: Automatic rollback on any step failure
+    
+    confidence: high
+  
+  - name: Payment Processing
+    description: Payment authorization, capture, refunds, terminal management
+    entities:
+      - PaymentTerminal:
+          fields:
+            - id: UUID
+            - name: string
+            - type: string (pax, ingenico, verifone, virtual)
+            - locationId: UUID (foreign key)
+            - ipAddress: string (optional)
+            - port: integer (optional)
+            - serialNumber: string (optional, unique)
+            - model: string (optional)
+            - enabled: boolean (default true)
+            - firmwareVersion: string (optional)
+            - lastHeartbeat: timestamp (optional)
+            - metadata: JSON (optional)
+            - deletedAt: timestamp (optional, soft delete)
+            - createdAt: timestamp
+            - updatedAt: timestamp
+      
+      - PaxTransaction:
+          fields:
+            - id: UUID
+            - terminalId: string
+            - transactionId: UUID (optional, link to main Transaction)
+            - transactionType: string (sale, refund, void, auth, capture)
+            - amount: float
+            - referenceNumber: string (unique)
+            - invoiceNumber: string (optional)
+            - success: boolean
+            - responseCode: string
+            - responseMessage: string
+            - authCode: string (optional)
+            - cardType: string (optional)
+            - last4: string (optional)
+            - rawRequest: JSON (optional)
+            - rawResponse: JSON (optional)
+            - createdAt: timestamp
+    
+    capabilities:
+      - Stripe Payment Intent creation
+      - PAX terminal integration (sale, refund, void)
+      - Terminal registration and management
+      - Terminal health monitoring
+      - Payment routing (Stripe, PAX, offline)
+      - Offline payment authorization
+      - Payment capture queueing
+    
+    integrations:
+      - Stripe API (v2025-12-15.clover, 30s timeout, 3 retries)
+      - PAX terminals (IP-based communication)
+    
+    fallback:
+      - OfflinePaymentAgent when Stripe unavailable
+      - Queues payment capture for later processing
+    
+    confidence: high
+  
+  - name: Customer Management
+    description: Customer profiles, loyalty programs, purchase history
+    entities:
+      - Customer:
+          fields:
+            - id: UUID
+            - email: string (optional, unique)
+            - phone: string (optional, unique)
+            - firstName: string
+            - lastName: string
+            - loyaltyPoints: integer (default 0)
+            - lifetimeValue: float (default 0)
+            - ageVerified: boolean (default false)
+            - dateOfBirth: date (optional)
+            - idScanUrl: string (optional, S3 URL)
+            - createdAt: timestamp
+            - updatedAt: timestamp
+    
+    capabilities:
+      - Customer registration
+      - Loyalty points tracking
+      - Purchase history retrieval
+      - Customer search (name, email, phone)
+      - Top customers by lifetime value
+    
+    confidence: high
+  
+  - name: Compliance & Audit
+    description: Age verification, audit logging, price overrides, compliance events
+    entities:
+      - AuditLog:
+          fields:
+            - id: UUID
+            - eventType: string (PAYMENT_ACCESS, AGE_VERIFICATION, PRICE_OVERRIDE, etc.)
+            - userId: UUID (optional)
+            - action: string
+            - resourceId: string (optional)
+            - timestamp: timestamp
+            - ipAddress: string (optional)
+            - userAgent: string (optional)
+            - result: string (success, failure)
+            - details: JSON (optional, AES-256-GCM encrypted)
+          invariants:
+            - Records are immutable (database-level constraints)
+            - Details field encrypted with AUDIT_LOG_ENCRYPTION_KEY
+      
+      - PriceOverride:
+          fields:
+            - id: UUID
+            - transactionId: UUID (foreign key)
+            - itemId: string
+            - originalPrice: float
+            - overridePrice: float
+            - reason: enum (PRICE_MATCH, DAMAGED_GOODS, CUSTOMER_SATISFACTION, OTHER)
+            - reasonNotes: string (optional, required if reason=OTHER)
+            - managerId: UUID (foreign key to User)
+            - managerName: string (cached for audit)
+            - approvedAt: timestamp
+            - cashierId: UUID (optional)
+            - cashierName: string (optional)
+            - terminalId: string (optional)
+          invariants:
+            - managerId must have MANAGER or ADMIN role
+            - overridePrice cannot be negative
+            - Warns if discount > 50% (but allows)
+      
+      - ComplianceEvent:
+          fields:
+            - id: UUID
+            - transactionId: UUID (foreign key)
+            - eventType: string (age_verification, id_scan, etc.)
+            - verified: boolean
+            - verifiedBy: UUID (optional, user who verified)
+            - metadata: JSON (optional)
+            - createdAt: timestamp
+    
+    capabilities:
+      - Age verification (21+ requirement)
+      - Manager PIN authorization for price overrides
+      - Audit trail for sensitive operations
+      - Compliance event tracking
+      - Immutable audit log storage
+    
+    security:
+      - Audit log encryption (AES-256-GCM)
+      - Immutability enforced at database level
+      - PIN-based manager authorization
+    
+    confidence: high
+  
+  - name: Location Management
+    description: Store locations, tax configuration, receipt settings
+    entities:
+      - Location:
+          fields:
+            - id: UUID
+            - name: string
+            - address: string
+            - city: string
+            - state: string
+            - zip: string
+            - taxRate: float (default 0.07, 7% Florida state tax)
+            - countyTaxRate: float (optional)
+            - licenseNumber: string (optional)
+            - licenseExpiry: date (optional)
+            - receiptHeader: string (optional)
+            - receiptFooter: string (optional)
+            - createdAt: timestamp
+    
+    capabilities:
+      - Location registration
+      - Tax rate configuration
+      - License expiry tracking
+      - Receipt customization
+    
+    confidence: high
+  
+  - name: Receipts
+    description: Receipt generation, storage, reprinting
+    entities:
+      - Receipt:
+          fields:
+            - id: UUID
+            - transactionId: UUID (unique, foreign key)
+            - content: text (plain text, 80-column thermal format)
+            - htmlContent: text (optional, for browser printing)
+            - printedAt: timestamp (optional)
+            - reprintCount: integer (default 0)
+            - lastReprintAt: timestamp (optional)
+            - createdAt: timestamp
+    
+    capabilities:
+      - Receipt generation (plain text + HTML)
+      - Receipt storage for reprints
+      - Reprint tracking
+      - Thermal printer format (80 columns)
+    
+    confidence: high
+  
+  - name: Reporting & Analytics
+    description: Sales reports, inventory reports, employee performance
+    entities:
+      - EventLog:
+          fields:
+            - id: UUID
+            - eventType: string
+            - aggregateId: string (optional)
+            - timestamp: timestamp
+            - locationId: UUID (optional)
+            - payload: JSON
+            - metadata: JSON (optional)
+            - processed: boolean (default false)
+            - processedAt: timestamp (optional)
+    
+    capabilities:
+      - Daily sales reports
+      - Sales summary by period
+      - Top selling products
+      - Inventory reports (stock levels, turnover, low stock)
+      - Employee performance tracking
+      - Report export (CSV, Excel, PDF)
+    
+    confidence: high
+  
+  - name: External Integrations
+    description: Webhook handling, delivery platform integration
+    entities:
+      - Webhook events stored in EventLog
+    
+    capabilities:
+      - Stripe webhook processing (payment status updates)
+      - Uber Eats order ingestion
+      - DoorDash order ingestion
+      - Webhook signature verification (Stripe only)
+      - Idempotent webhook processing
+    
+    integrations:
+      - Stripe webhooks (signature verified)
+      - Uber Eats webhooks (signature not implemented)
+      - DoorDash webhooks (signature not implemented)
+    
+    confidence: high
+
+# ==============================================================================
+# WORKFLOWS
+# ==============================================================================
+workflows:
+  
+  - name: User Authentication
+    trigger: POST /auth/login
+    actors: [CASHIER, MANAGER, ADMIN]
+    preconditions:
+      - Backend healthy and reachable
+      - Valid username and password provided
+      - CSRF token obtained
+    steps:
+      1. Client requests CSRF token (GET /auth/csrf-token)
+      2. Client submits username, password, CSRF token
+      3. Backend validates credentials (bcrypt comparison)
+      4. Backend generates JWT with jti (unique token ID)
+      5. Backend sets HttpOnly cookie (access_token, 8-hour expiry)
+      6. Backend returns user object (id, username, role, firstName, lastName)
+      7. Frontend stores user in localStorage and AuthContext
+      8. Frontend validates session on page load (GET /auth/validate)
+    postconditions:
+      - User authenticated with valid JWT
+      - Session stored in Redis (for revocation)
+      - User redirected based on role (ADMIN/MANAGER → /admin, CASHIER → /pos)
+    error_handling:
+      - Rate limiting: 429 after 5 attempts per 60 seconds
+      - Invalid credentials: 401 Unauthorized
+      - Invalid CSRF: 403 Forbidden
+    confidence: high
+  
+  - name: POS Transaction (Cash)
+    trigger: User clicks "Complete Sale" in Checkout component
+    actors: [CASHIER, MANAGER, ADMIN]
+    preconditions:
+      - Cart has at least 1 item
+      - Age verification checked if any item age-restricted
+      - VITE_LOCATION_ID and VITE_TERMINAL_ID configured
+    steps:
+      1. Frontend validates cart and age verification
+      2. Frontend calculates subtotal, tax (7% hardcoded), total
+      3. Frontend sends POST /orders with CreateOrderDto
+      4. Backend processes via OrderOrchestrator (SAGA pattern):
+         a. InventoryAgent reserves inventory (SELECT FOR UPDATE lock)
+         b. PricingAgent calculates pricing (trusts POS values if provided)
+         c. ComplianceAgent verifies age (throws if not verified)
+         d. PaymentAgent authorizes cash payment (immediate capture)
+         e. Create Transaction, TransactionItem, Payment records
+         f. Commit inventory (decrement quantity, clear reserved)
+         g. Emit order.created event
+      5. Backend returns OrderResponseDto
+      6. Frontend shows success toast
+      7. Frontend clears cart after 2 seconds
+    postconditions:
+      - Transaction recorded in database
+      - Inventory decremented
+      - Payment captured
+      - ComplianceEvent logged if age-restricted
+      - AuditLog entry created
+    error_handling:
+      - Insufficient inventory: 400 BadRequest, rollback reservation
+      - Age not verified: 403 Forbidden
+      - Payment failure: Rollback entire transaction
+    idempotency: Enforced via idempotencyKey (UUID from frontend)
+    rate_limiting: 30 orders per 60 seconds per terminal
+    confidence: high
+  
+  - name: POS Transaction (Card)
+    trigger: User clicks "Complete Sale" with card payment
+    actors: [CASHIER, MANAGER, ADMIN]
+    preconditions:
+      - Same as cash transaction
+      - STRIPE_SECRET_KEY configured
+    steps:
+      1-3. Same as cash transaction
+      4. Backend processes via OrderOrchestrator:
+         a-c. Same as cash (inventory, pricing, compliance)
+         d. PaymentAgent checks Stripe availability
+            - If available: Create Stripe Payment Intent
+            - If unavailable: OfflinePaymentAgent authorizes locally
+         e-g. Same as cash (transaction creation, commit, emit)
+      5. If offline: Queue payment capture in OfflineQueueService
+      6-7. Same as cash (response, clear cart)
+    postconditions:
+      - Same as cash transaction
+      - If offline: Payment queued for capture
+    error_handling:
+      - Stripe unavailable: Falls back to offline mode
+      - Card declined: 400 BadRequest, rollback
+      - Network timeout: 500 Internal Server Error
+    fallback: OfflinePaymentAgent + OfflineQueueService
+    confidence: high
+  
+  - name: Price Override Authorization
+    trigger: Manager enters PIN for price adjustment
+    actors: [MANAGER, ADMIN]
+    preconditions:
+      - Transaction exists
+      - Item exists in transaction
+      - Manager has valid PIN
+    steps:
+      1. Cashier requests price override (mechanism unclear in current UI)
+      2. ManagerOverride modal appears
+      3. Manager enters PIN (4-6 digits)
+      4. Manager enters new price
+      5. Manager selects reason (PRICE_MATCH, DAMAGED_GOODS, CUSTOMER_SATISFACTION, OTHER)
+      6. If OTHER, manager enters reason notes
+      7. Manager clicks "Approve Override"
+      8. Backend validates PIN via PinAuthService (bcrypt comparison)
+      9. Backend validates manager role (MANAGER or ADMIN)
+      10. Backend validates override price (cannot be negative, warns if >50% discount)
+      11. Backend creates PriceOverride record
+      12. Backend updates TransactionItem with new price
+      13. Backend recalculates transaction totals
+      14. Backend logs to AuditLog (PRICE_OVERRIDE event)
+      15. Returns approval confirmation
+    postconditions:
+      - PriceOverride record created (immutable)
+      - TransactionItem price updated
+      - Transaction total recalculated
+      - AuditLog entry created
+    error_handling:
+      - Invalid PIN: 401 Unauthorized
+      - Insufficient role: 403 Forbidden
+      - Negative price: 400 BadRequest
+    integration_gap: ManagerOverride component exists but not integrated into POS UI
+    confidence: high
+  
+  - name: Product Search
+    trigger: User types in ProductSearch component
+    actors: [CASHIER, MANAGER, ADMIN]
+    preconditions:
+      - Backend reachable
+      - Products exist in database
+    steps:
+      1. User types search query (300ms debounce)
+      2. Frontend sends GET /api/products/search?query={text}
+      3. Backend performs ILIKE query on name, SKU, description
+      4. Backend returns product list
+      5. Frontend displays results in grid
+      6. User can filter by category (client-side)
+    postconditions:
+      - Products displayed matching query
+    alternative: AI-powered semantic search (GET /api/products/ai-search)
+    confidence: high
+  
+  - name: Inventory Adjustment
+    trigger: POST /api/inventory/adjust
+    actors: [MANAGER, ADMIN]
+    preconditions:
+      - Product exists
+      - Location exists
+      - Valid adjustment reason
+    steps:
+      1. Frontend sends AdjustInventoryDto (productId, locationId, quantity, reason)
+      2. Backend validates product and location
+      3. Backend updates Inventory.quantity
+      4. Backend logs adjustment reason (sale, restock, damage, count)
+      5. Backend emits inventory.updated event
+    postconditions:
+      - Inventory quantity updated
+      - Adjustment logged
+    locking: Row-level lock during adjustment
+    rate_limiting: 50 adjustments per 60 seconds
+    confidence: high
+  
+  - name: Daily Sales Report
+    trigger: GET /reporting/sales/daily?date={YYYY-MM-DD}
+    actors: [MANAGER, ADMIN]
+    preconditions:
+      - Valid date provided
+    steps:
+      1. Backend queries Transaction table for date range
+      2. Aggregates: total revenue, transaction count, payment methods
+      3. Groups by hour for hourly breakdown
+      4. Returns DailySalesReportDto
+    postconditions:
+      - Report generated with aggregated data
+    export_formats: [CSV, Excel, PDF]
+    confidence: high
+  
+  - name: Receipt Generation
+    trigger: POST /receipts/:transactionId/generate
+    actors: [CASHIER, MANAGER, ADMIN]
+    preconditions:
+      - Transaction exists
+    steps:
+      1. Backend fetches Transaction with items, location, customer
+      2. Backend generates plain text receipt (80-column thermal format)
+      3. Backend generates HTML receipt (browser print)
+      4. Backend stores in Receipt table (content, htmlContent)
+      5. Backend tracks printedAt, reprintCount
+      6. Returns receipt text
+    postconditions:
+      - Receipt stored for reprints
+      - Receipt text returned
+    reprint: GET /receipts/:transactionId (increments reprintCount)
+    integration_gap: Frontend doesn't call receipt API after checkout
+    confidence: high
+  
+  - name: Stripe Webhook Processing
+    trigger: POST /webhooks/stripe (external)
+    actors: [Stripe API]
+    preconditions:
+      - Valid Stripe signature
+    steps:
+      1. Stripe sends webhook event
+      2. Backend validates signature (STRIPE_WEBHOOK_SECRET)
+      3. Backend stores event in EventLog (idempotency)
+      4. Backend processes event based on type:
+         - payment_intent.succeeded: Update Payment status to captured
+         - payment_intent.payment_failed: Update Payment status to failed
+         - payment_intent.canceled: Update Payment status to canceled
+         - charge.refunded: Create refund record
+         - charge.dispute.created: Log dispute
+      5. Backend marks event as processed
+      6. Returns 200 OK
+    postconditions:
+      - Payment status updated
+      - Event logged
+    error_handling:
+      - Invalid signature: 400 BadRequest (Stripe won't retry)
+      - Processing error: 500 Internal Server Error (Stripe retries)
+    idempotency: Event ID stored in EventLog
+    confidence: high
+  
+  - name: Delivery Platform Webhook Processing
+    trigger: POST /webhooks/ubereats OR POST /webhooks/doordash
+    actors: [Uber Eats, DoorDash]
+    preconditions:
+      - Valid webhook payload
+    steps:
+      1. Platform sends webhook event
+      2. Backend logs warning (signature verification not implemented)
+      3. Backend stores event in EventLog (idempotency)
+      4. Backend checks event status (only process if status=created)
+      5. Backend transforms platform payload to CreateOrderDto
+      6. Backend processes via OrderOrchestrator
+      7. Backend marks event as processed
+      8. Returns 200 OK with orderId
+    postconditions:
+      - Order created in system
+      - Transaction.channel set to 'uber_eats' or 'doordash'
+    error_handling:
+      - Validation error: 400 BadRequest
+      - Processing error: 500 Internal Server Error
+    security_gap: Signature verification not implemented
+    confidence: high
+  
+  - name: Offline Transaction Sync
+    trigger: Network reconnection detected
+    actors: [System background process]
+    preconditions:
+      - Network online
+      - Pending operations in queue
+    steps:
+      1. OfflineQueueService detects network online
+      2. Fetches pending operations from EventLog (FIFO, max 5 concurrent)
+      3. For each operation:
+         a. Update status to processing
+         b. Execute operation via registered handler
+         c. If success: Mark as completed
+         d. If failure: Increment attempts, retry later (max 5 attempts)
+      4. Processes queue every 5 minutes (cron job)
+    postconditions:
+      - Queued operations processed
+      - Payment captures sent to Stripe
+      - Transaction.syncedToCloud updated
+    error_handling:
+      - Max attempts reached: Mark permanently failed
+      - Transient errors: Retry on next cron run
+    confidence: high
+  
+  - name: Automated Backup
+    trigger: Daily at 2 AM (cron)
+    actors: [System background process]
+    preconditions:
+      - BACKUP_ENABLED=true
+      - PostgreSQL accessible
+    steps:
+      1. BackupService executes pg_dump
+      2. Creates backup file with timestamp
+      3. Calculates SHA-256 checksum
+      4. Stores backup metadata
+      5. If S3 enabled: Upload to S3 bucket
+      6. Cleans up backups older than retention period (30 days)
+    postconditions:
+      - Backup file created in ./backend/backups/
+      - Metadata stored
+      - Old backups removed
+    error_handling:
+      - Backup failure: Alert sent to monitoring system
+      - Disk full: Backup fails, alert sent
+    confidence: high
+
+# ==============================================================================
+# INVARIANTS
+# ==============================================================================
+invariants:
+  
+  - name: Age Verification Enforcement
+    description: Transactions with age-restricted items MUST have ageVerified=true
+    enforcement: ComplianceAgent throws ForbiddenException if not verified
+    scope: Order processing workflow
+    minimum_age: 21 (Florida law)
+    verification_methods:
+      - Manual cashier verification (checkbox)
+      - Customer DOB check if customerId provided
+    audit: Logged in ComplianceEvent table
+    penalty: Transaction rejected (403 Forbidden)
+    confidence: high
+  
+  - name: Inventory Consistency
+    description: Inventory quantity never goes negative during reservation
+    enforcement: SELECT FOR UPDATE lock + atomic update in transaction
+    implementation: InventoryAgent.checkAndReserve()
+    scope: Order processing workflow
+    rollback: Automatic on transaction failure
+    prevents: Overselling when multiple cashiers access same product
+    confidence: high
+  
+  - name: Idempotency
+    description: Duplicate order requests with same idempotencyKey return cached result
+    enforcement: Unique constraint on Transaction.idempotencyKey
+    implementation: OrdersController checks existing transaction before processing
+    scope: POST /orders endpoint
+    audit: Logged via AuditService.logIdempotencyCheck()
+    prevents: Double-charging on network retry
+    confidence: high
+  
+  - name: Price Override Authorization
+    description: Price overrides require manager/admin PIN authentication
+    enforcement: PriceOverrideService validates PIN + role
+    scope: Price override workflow
+    audit: Immutable PriceOverride record with manager details
+    restrictions:
+      - Override price cannot be negative
+      - Warns if discount > 50% (but allows)
+    confidence: high
+  
+  - name: JWT Token Revocation
+    description: Logged-out tokens are blacklisted and rejected
+    enforcement: JwtAuthGuard checks Redis blacklist before accepting token
+    scope: All authenticated endpoints
+    storage: Redis with TTL matching JWT expiry (8 hours)
+    prevents: Using logged-out tokens
+    confidence: high
+  
+  - name: CSRF Protection
+    description: State-changing requests require valid CSRF token
+    enforcement: Middleware validates x-csrf-token header
+    scope: POST, PUT, PATCH, DELETE requests
+    exemptions: Webhook endpoints (use signature verification instead)
+    pattern: Double submit cookie
+    penalty: 403 Forbidden on mismatch
+    confidence: high
+  
+  - name: Tax Calculation
+    description: Tax calculated from location-specific rates
+    default: 7% Florida state tax (Location.taxRate)
+    optional: County tax (Location.countyTaxRate)
+    source_of_truth: POS frontend calculates, backend trusts if provided
+    issue: Tax rate hardcoded at 7% in frontend CartLogic.ts
+    confidence: high
+  
+  - name: Payment Method Routing
+    description: Cash payments bypass Stripe, card payments require Stripe or offline mode
+    enforcement: PaymentAgent routes based on method
+    scope: Payment processing workflow
+    offline_fallback: OfflinePaymentAgent if Stripe unavailable
+    confidence: high
+  
+  - name: Audit Log Immutability
+    description: AuditLog records cannot be modified or deleted
+    enforcement: Database-level constraints (migration 20260103193315)
+    scope: All audit-logged events
+    events_logged:
+      - PAYMENT_ACCESS, AGE_VERIFICATION, PRICE_OVERRIDE
+      - ORDER_CREATION, IDEMPOTENCY_CHECK
+    encryption: AES-256-GCM (AUDIT_LOG_ENCRYPTION_KEY)
+    confidence: high
+  
+  - name: Receipt Persistence
+    description: Receipt content stored for reprints
+    enforcement: Receipt table stores plain text + HTML
+    scope: Receipt generation workflow
+    tracking: printedAt, reprintCount, lastReprintAt
+    confidence: high
+  
+  - name: Role-Based Access Control
+    description: Backend endpoints enforce role restrictions
+    enforcement: RolesGuard + @Roles decorator
+    scope: All protected endpoints
+    frontend: ProtectedRoute component enforces UI access
+    examples:
+      - Backup operations: ADMIN only
+      - Price overrides: MANAGER or ADMIN
+      - POS terminal: All roles
+      - Admin panel: MANAGER or ADMIN
+    confidence: high
+  
+  - name: Rate Limiting
+    description: Requests limited per endpoint and time window
+    enforcement: ThrottlerGuard with Redis storage
+    scope: All endpoints
+    tiers:
+      - default: 100 requests per 60 seconds
+      - strict (login): 5 requests per 60 seconds
+      - orders: 30 requests per 60 seconds
+      - inventory: 50 requests per 60 seconds
+    penalty: 429 Too Many Requests
+    confidence: high
+
+# ==============================================================================
+# NON-FUNCTIONAL REQUIREMENTS
+# ==============================================================================
+non_functional:
+  
+  reliability:
+    
+    - characteristic: Fault Tolerance
+      mechanisms:
+        - Circuit breaker pattern (Conexxus, Loki)
+        - Offline queue with retry (5 max attempts)
+        - Redis failover with in-memory cache
+        - Graceful degradation (offline payment mode)
+        - Database row-level locking (prevents race conditions)
+      targets:
+        - Circuit breaker: Opens after 5 failures, 60s timeout
+        - Offline queue: Processes every 5 minutes, max 5 concurrent
+        - Redis fallback: 100-entry LRU cache
+      confidence: high
+    
+    - characteristic: Error Handling
+      mechanisms:
+        - Global exception filter (standardized error responses)
+        - Global error handlers (uncaughtException, unhandledRejection, SIGTERM, SIGINT)
+        - Environment validation on startup (fail-fast)
+        - Request idempotency (order creation)
+      targets:
+        - All errors logged with correlation IDs
+        - Graceful shutdown on termination signals
+        - 1-second grace period for log flushing
+      issue: unhandledRejection does NOT terminate process (potential memory leak)
+      confidence: high
+    
+    - characteristic: Data Integrity
+      mechanisms:
+        - Database transactions (ACID compliance)
+        - Row-level locking (SELECT FOR UPDATE)
+        - Idempotency keys (unique constraints)
+        - Audit log immutability (database-level)
+        - Checksum verification (backups)
+      targets:
+        - Zero data loss for committed transactions
+        - Automatic rollback on transaction failure
+      confidence: high
+    
+    - characteristic: Backup & Recovery
+      mechanisms:
+        - Automated daily backups (2 AM cron)
+        - PostgreSQL pg_dump (custom format)
+        - SHA-256 checksum verification
+        - 30-day retention policy
+        - S3 upload support (optional)
+      targets:
+        - RPO: 24 hours (daily backups)
+        - RTO: Manual (no automatic failover)
+      storage: ./backend/backups/
+      confidence: high
+  
+  availability:
+    
+    - characteristic: Uptime
+      target: 99.9% (inferred, not explicitly stated)
+      confidence: low
+      mechanisms:
+        - Health check endpoints (/health, /health/ready, /health/live)
+        - Graceful shutdown (SIGTERM, SIGINT)
+        - Automatic reconnection (Prisma, Redis)
+      monitoring:
+        - Kubernetes-ready health probes
+        - Health checks every 30 seconds (network status)
+      single_point_of_failure: PostgreSQL (no built-in failover)
+    
+    - characteristic: Degraded Mode Operation
+      scenarios:
+        - Redis unavailable: In-memory cache (100 entries)
+        - Stripe unavailable: Offline payment agent + queue
+        - Conexxus unavailable: Circuit breaker fails fast
+        - Loki unavailable: Console/file logging
+        - Network lost: Offline mode, queues operations
+      hard_failures:
+        - PostgreSQL unavailable: All operations fail
+      confidence: high
+    
+    - characteristic: Network Resilience
+      mechanisms:
+        - Network status monitoring (30s interval)
+        - Offline detection (2 consecutive failures)
+        - Offline queue (store-and-forward)
+        - Automatic sync when online
+      targets:
+        - Offline detection: 1 minute (2 failures × 30s)
+        - Sync interval: 5 minutes (cron)
+      confidence: high
+  
+  performance:
+    
+    - characteristic: Response Time
+      targets:
+        - API requests: <500ms (inferred)
+        - Database queries: Indexed (product search, inventory lookup)
+        - Payment processing: 30s timeout (Stripe)
+      confidence: low
+      monitoring: HTTP request duration tracked in metrics
+    
+    - characteristic: Throughput
+      targets:
+        - Orders: 30 per minute per terminal (rate limit)
+        - Inventory operations: 50 per minute (rate limit)
+        - Default requests: 100 per minute (rate limit)
+      confidence: high
+    
+    - characteristic: Concurrency
+      mechanisms:
+        - Database connection pool (min 2, max 10)
+        - Row-level locking (inventory)
+        - Offline queue concurrency (max 5)
+      targets:
+        - PostgreSQL max connections: 100
+        - Concurrent queue operations: 5
+      confidence: high
+    
+    - characteristic: Resource Limits
+      thresholds:
+        - Memory heap: 300MB (health check), 500MB (liveness)
+        - Memory RSS: 500MB
+        - Disk usage: 90% (warning), 95% (critical)
+        - Redis memory: 256MB (LRU eviction)
+      monitoring: Health check endpoints report status
+      confidence: high
+  
+  scalability:
+    
+    - characteristic: Horizontal Scaling
+      current: Single-instance deployment
+      limitations:
+        - In-memory cache not shared
+        - Rate limits not shared
+        - No built-in load balancing
+      workaround: Deploy multiple instances with shared Redis/PostgreSQL
+      confidence: high
+    
+    - characteristic: Vertical Scaling
+      supported: true
+      limits:
+        - PostgreSQL: Configurable (shared_buffers, max_connections)
+        - Redis: 256MB max memory (configurable)
+        - Docker resource limits: 2 CPU, 2GB RAM (backend)
+      confidence: high
+    
+    - characteristic: Data Growth
+      mechanisms:
+        - Log rotation (14 days combined, 30 days errors)
+        - Backup retention (30 days)
+        - Offline queue cleanup (7 days)
+      no_automatic_cleanup:
+        - AuditLog (compliance requirement)
+        - Transaction history
+      confidence: high
+  
+  security:
+    
+    - characteristic: Authentication
+      mechanisms:
+        - JWT tokens (8-hour expiry, HttpOnly cookies)
+        - Bcrypt password hashing (10 rounds)
+        - PIN authentication (hashed)
+        - Token revocation (Redis blacklist)
+        - Session validation
+      rate_limiting: 5 login attempts per 60 seconds
+      confidence: high
+    
+    - characteristic: Authorization
+      mechanisms:
+        - Role-based access control (ADMIN, MANAGER, CASHIER)
+        - RolesGuard + @Roles decorator
+        - Frontend ProtectedRoute component
+      enforcement: Backend + frontend
+      confidence: high
+    
+    - characteristic: Data Protection
+      mechanisms:
+        - HTTPS support (optional, SSL_KEY_PATH, SSL_CERT_PATH)
+        - CSRF protection (double submit cookie)
+        - Audit log encryption (AES-256-GCM)
+        - Password hashing (bcrypt)
+        - JWT in HttpOnly cookies
+      gaps:
+        - Database not encrypted at rest
+        - Only audit logs encrypted
+      confidence: high
+    
+    - characteristic: API Security
+      mechanisms:
+        - Rate limiting (4 tiers)
+        - CORS configuration (ALLOWED_ORIGINS)
+        - Helmet security headers
+        - Input validation (ValidationPipe)
+        - Webhook signature verification (Stripe only)
+      gaps:
+        - Uber Eats/DoorDash signature verification not implemented
+      confidence: high
+    
+    - characteristic: Audit & Compliance
+      mechanisms:
+        - Immutable audit logs
+        - Encrypted audit details
+        - Correlation ID tracking
+        - Comprehensive event logging
+      events_tracked:
+        - Authentication, authorization
+        - Payment access
+        - Age verification
+        - Price overrides
+        - Order creation
+      retention: No automatic cleanup (compliance)
+      confidence: high
+  
+  observability:
+    
+    - characteristic: Logging
+      implementation: Winston (structured JSON)
+      transports:
+        - Console (always)
+        - Daily rotate files (production)
+        - Loki (optional)
+      features:
+        - Correlation IDs (CLS namespace)
+        - Context tagging
+        - Metadata support
+        - Multiple log levels
+      retention: 14 days combined, 30 days errors
+      confidence: high
+    
+    - characteristic: Metrics
+      categories:
+        - Business metrics (orders, payments, refunds, inventory)
+        - System metrics (HTTP, database, Redis, Stripe)
+        - Cache metrics (hits, misses, hit rate)
+        - Queue metrics (pending, completed, failed)
+      storage: In-memory (MetricsService)
+      export: Prometheus-compatible (if enabled)
+      gaps:
+        - No Prometheus exporter
+        - No Grafana dashboard
+      confidence: high
+    
+    - characteristic: Tracing
+      mechanisms:
+        - Correlation ID middleware
+        - Request context (CLS)
+        - Performance monitoring (if Sentry enabled)
+      propagation: Correlation IDs in all logs and downstream requests
+      gaps:
+        - No distributed tracing (OpenTelemetry, Jaeger)
+      confidence: high
+    
+    - characteristic: Alerting
+      mechanisms:
+        - Monitoring service (alert rules)
+        - Business metrics alerts (failure rates, zero revenue)
+        - System alerts (memory, disk, CPU)
+        - Integration alerts (Conexxus, Stripe down)
+      channels:
+        - Console logs (always)
+        - Sentry (optional)
+        - Webhook (optional)
+      thresholds:
+        - Order failure rate: 10%
+        - Payment failure rate: 5%
+        - Zero revenue: 1 hour during business hours
+        - High memory: 90%
+        - Disk full: 95%
+      confidence: high
+    
+    - characteristic: Health Checks
+      endpoints:
+        - /health (full system)
+        - /health/ready (readiness probe)
+        - /health/live (liveness probe)
+        - /health/db (database)
+        - /health/redis (cache)
+        - /health/backup (backup system)
+      kubernetes_ready: true
+      format: JSON with detailed subsystem status
+      confidence: high
+  
+  maintainability:
+    
+    - characteristic: Code Organization
+      architecture: Modular (NestJS modules)
+      patterns:
+        - SAGA (order orchestration)
+        - Circuit breaker (external services)
+        - Repository (data access)
+        - Agent (domain logic)
+      confidence: high
+    
+    - characteristic: Documentation
+      types:
+        - API documentation (Swagger/OpenAPI)
+        - Code comments
+        - README files
+        - Deployment guides
+        - Troubleshooting guides
+      api_docs: http://localhost:3000/api/docs
+      confidence: high
+    
+    - characteristic: Testing
+      types:
+        - Unit tests (Jest)
+        - E2E tests (Playwright for frontend)
+        - Integration tests
+        - Load tests (K6 scripts)
+      coverage: Present but percentage unknown
+      confidence: low
+    
+    - characteristic: Configuration Management
+      mechanism: Environment variables (.env file)
+      validation: Startup validation (fail-fast)
+      secrets:
+        - JWT_SECRET (64-byte hex)
+        - AUDIT_LOG_ENCRYPTION_KEY (32-byte base64)
+        - DB_PASSWORD, REDIS_PASSWORD
+        - STRIPE_SECRET_KEY
+      gaps:
+        - No secret rotation
+        - No Vault integration
+      confidence: high
+  
+  operability:
+    
+    - characteristic: Deployment
+      primary: Docker Compose (single-host)
+      kubernetes_ready: true (health probes)
+      startup_time: ~60 seconds
+      confidence: high
+    
+    - characteristic: Monitoring
+      mechanisms:
+        - Health check endpoints
+        - Metrics collection
+        - Log aggregation (Loki)
+        - Alert rules
+      gaps:
+        - No built-in dashboard
+        - No Prometheus exporter
+        - No Grafana integration
+      confidence: high
+    
+    - characteristic: Backup & Restore
+      backup:
+        - Automated daily (2 AM)
+        - 30-day retention
+        - Checksum verification
+        - S3 upload (optional)
+      restore:
+        - Manual process
+        - No automated restore testing
+      confidence: high
+    
+    - characteristic: Disaster Recovery
+      mechanisms:
+        - Automated backups
+        - WAL archiving
+        - Point-in-time recovery (PITR) support
+      targets:
+        - RPO: 24 hours
+        - RTO: Manual (no automatic failover)
+      confidence: high
+
+# ==============================================================================
+# GAPS & LIMITATIONS
+# ==============================================================================
+gaps_and_limitations:
+  
+  functional_gaps:
+    - gap: Admin Panel Not Connected
+      description: Frontend admin UI shows mock data, no backend integration
+      impact: Managers cannot manage products, users, inventory from UI
+      workaround: Use backend API docs (http://localhost:3000/api/docs)
+      confidence: high
+    
+    - gap: Price Override Not Integrated
+      description: ManagerOverride component exists but not wired into POS flow
+      impact: Managers cannot override prices from POS UI
+      workaround: Use backend API directly
+      confidence: high
+    
+    - gap: No Receipt Printing from Frontend
+      description: Receipt API exists, frontend doesn't call it
+      impact: Cashiers cannot print receipts from POS terminal
+      workaround: Access backend API directly
+      confidence: high
+    
+    - gap: Tax Rate Hardcoded
+      description: Frontend CartLogic.ts has 7% hardcoded
+      impact: Multi-location deployments with different tax rates won't work
+      workaround: Edit CartLogic.ts for each location
+      confidence: high
+    
+    - gap: Location ID Hardcoded
+      description: VITE_LOCATION_ID and VITE_TERMINAL_ID set at build time
+      impact: Cannot switch locations without rebuild
+      workaround: Separate frontend build per location
+      confidence: high
+    
+    - gap: Webhook Signature Verification
+      description: Uber Eats and DoorDash signatures not verified
+      impact: Security risk, unauthenticated webhooks accepted
+      workaround: Implement signature verification
+      confidence: high
+  
+  non_functional_gaps:
+    - gap: No Distributed Tracing
+      description: No OpenTelemetry or Jaeger integration
+      impact: Cannot trace requests across services
+      workaround: Correlation IDs in logs
+      confidence: high
+    
+    - gap: No Metrics Export
+      description: No Prometheus exporter
+      impact: Cannot scrape metrics for dashboards
+      workaround: Query MetricsService directly
+      confidence: high
+    
+    - gap: No Automatic Scaling
+      description: Single-instance deployment, no auto-scaling
+      impact: Cannot handle traffic spikes
+      workaround: Manual horizontal scaling
+      confidence: high
+    
+    - gap: No Load Balancing
+      description: No built-in load balancer
+      impact: Single point of failure
+      workaround: Deploy behind nginx/HAProxy
+      confidence: high
+    
+    - gap: No Secret Management
+      description: Secrets in .env file, no Vault integration
+      impact: Manual secret rotation required
+      workaround: Use managed secret services
+      confidence: high
+    
+    - gap: No Automatic Failover
+      description: PostgreSQL has no automatic failover
+      impact: Manual intervention required for database failure
+      workaround: Use managed PostgreSQL (RDS, Cloud SQL)
+      confidence: high
+    
+    - gap: No Backup Restore Testing
+      description: Backups verified by checksum, but not restored
+      impact: Backups may be corrupted
+      workaround: Manual periodic restore tests
+      confidence: high
+    
+    - gap: No Synthetic Monitoring
+      description: No synthetic transactions or uptime monitoring
+      impact: Downtime not detected until user reports
+      workaround: External uptime monitoring (Pingdom, UptimeRobot)
+      confidence: high
+
+# ==============================================================================
+# END OF SPARC
+# ==============================================================================
+

@@ -1,0 +1,839 @@
+# ==============================================================================
+# OBSERVED NON-FUNCTIONAL CHARACTERISTICS - LIQUOR POS
+# ==============================================================================
+# Generated: 2026-01-05
+# Perspective: Reliability Engineer
+# Focus: What EXISTS in production (not what should exist)
+# ==============================================================================
+
+observed_non_functional:
+
+  # ============================================================================
+  # 1. RELIABILITY MECHANISMS
+  # ============================================================================
+  reliability_mechanisms:
+    
+    - mechanism: Environment Validation on Startup
+      implementation: backend/src/main.ts (bootstrap function)
+      behavior:
+        - Validates ALL required environment variables before app creation
+        - Calls validateEnvironment() and ConfigValidationService
+        - Fails fast with clear error if configuration invalid
+        - Logs validation success/failure
+      fail_fast: true
+      exit_code: 1 on validation failure
+      prevents: Silent failures due to missing config
+      
+    - mechanism: Global Error Handlers
+      implementation: backend/src/main.ts (setupGlobalErrorHandlers)
+      handlers:
+        - uncaughtException: Logs error, waits 1s for log flush, exits with code 1
+        - unhandledRejection: Logs warning, does NOT exit (potential memory leak)
+        - SIGTERM: Graceful shutdown, closes app, exits with code 0
+        - SIGINT: Graceful shutdown (Ctrl+C), closes app, exits with code 0
+      behavior:
+        - All errors logged with stack traces
+        - 1-second grace period for log flushing
+        - Graceful shutdown on termination signals
+      issue: unhandledRejection does NOT terminate process (may leak memory)
+      
+    - mechanism: Global Exception Filter
+      implementation: backend/src/common/filters/app-exception.filter.ts
+      features:
+        - Catches ALL exceptions (NestJS + generic errors)
+        - Converts to standardized AppException format
+        - Extracts correlation IDs from headers (x-request-id, x-correlation-id, x-trace-id)
+        - Generates request ID if not provided
+        - Maps HTTP status to error codes
+        - Logs at appropriate level (ERROR for 5xx, WARN for 429, DEBUG for 4xx)
+      error_format:
+        - statusCode
+        - code (ErrorCode enum)
+        - message (user-facing)
+        - timestamp
+        - path
+        - requestId
+        - details (optional)
+        - stack (development only)
+      prevents: Inconsistent error responses
+      
+    - mechanism: Circuit Breaker Pattern
+      implementation: backend/src/integrations/conexxus/circuit-breaker.ts
+      states:
+        - CLOSED: Normal operation, requests pass through
+        - OPEN: Service down, fail fast without calling service
+        - HALF_OPEN: Testing recovery, limited requests allowed
+      configuration:
+        - failureThreshold: 5 failures to open circuit
+        - successThreshold: 2 successes to close from half-open
+        - timeout: 60000ms (1 minute) before attempting recovery
+        - monitoringPeriod: 60000ms (1 minute) for counting failures
+      usage:
+        - Conexxus API integration (ConexxusHttpClient)
+        - Loki logging transport (LokiTransport)
+      behavior:
+        - Tracks failure/success counts
+        - Automatic recovery detection
+        - Fails fast when circuit open
+        - Logs state transitions
+      prevents: Cascading failures, resource exhaustion
+      
+    - mechanism: Offline Queue with Retry
+      implementation: backend/src/common/offline-queue.service.ts
+      features:
+        - Store-and-forward pattern for failed operations
+        - Automatic retry with exponential backoff
+        - Priority-based processing
+        - Max attempts configuration (default: 5)
+        - Concurrent operation limit (5 max)
+      operation_types:
+        - transaction: Full transaction data
+        - payment_capture: Deferred Stripe capture
+        - conexxus_sync: Inventory sync
+        - inventory_update: Stock adjustments
+      storage: EventLog table in PostgreSQL
+      processing:
+        - Cron job every 5 minutes (@Cron(CronExpression.EVERY_5_MINUTES))
+        - FIFO ordering within same priority
+        - Parallel processing up to MAX_CONCURRENT_OPERATIONS
+        - Marks permanently failed after max attempts
+      metrics:
+        - pending, processing, completed, failed counts
+        - success rate calculation
+      cleanup: Removes completed operations older than 7 days
+      handler_registry: Pluggable handlers for each operation type
+      
+    - mechanism: Network Status Monitoring
+      implementation: backend/src/common/network-status.service.ts
+      features:
+        - Monitors connectivity to external services
+        - Automatic health checks every 30 seconds
+        - Detects offline mode after 2 consecutive failures (1 minute)
+        - Notifies subscribers on status change
+      services_monitored:
+        - internet: https://www.google.com (5s timeout)
+        - stripe: https://api.stripe.com/healthcheck (5s timeout)
+        - conexxus: CONEXXUS_API_URL/api/v1/health (5s timeout)
+      behavior:
+        - Considers offline after 2 consecutive internet failures
+        - Tracks consecutive failure count
+        - Logs status changes (ONLINE/OFFLINE)
+        - Provides subscription mechanism for listeners
+      usage:
+        - OrderOrchestrator checks isStripeAvailable() before payment
+        - OfflinePaymentAgent activates when Stripe unavailable
+      manual_override: setOfflineMode() for testing
+      
+    - mechanism: Redis Failover with In-Memory Cache
+      implementation: backend/src/redis/redis.service.ts
+      modes:
+        - standalone: Single Redis instance (default)
+        - sentinel: Redis Sentinel for HA (if REDIS_SENTINEL_ENABLED=true)
+      fallback:
+        - In-memory LRU cache (max 100 entries)
+        - Activates when Redis connection fails
+        - Periodic cleanup of expired entries (every 60s)
+      retry_strategy:
+        - Max 3 retries
+        - Exponential backoff (min 100ms, max 2000ms)
+        - Stops retrying after 3 failures
+      sentinel_features:
+        - Automatic master failover
+        - Tracks failover count
+        - Updates sentinel info on connection
+      metrics:
+        - hits, misses, sets, deletes, errors
+        - hit rate calculation
+      health_status:
+        - up/down/degraded states
+        - Last error tracking
+        - Connection status
+      degradation: Runs in degraded mode with in-memory cache if Redis unavailable
+      
+    - mechanism: Database Connection Pooling
+      implementation: Prisma with pg adapter
+      configuration:
+        - DATABASE_POOL_MIN: 2 (default)
+        - DATABASE_POOL_MAX: 10 (default)
+      features:
+        - Connection reuse
+        - Automatic reconnection
+        - Health checks via /health/db endpoint
+      limits:
+        - max_connections: 100 (PostgreSQL config in docker-compose.yml)
+        - shared_buffers: 256MB
+        - effective_cache_size: 1GB
+      
+    - mechanism: Rate Limiting
+      implementation: ThrottlerGuard (NestJS)
+      storage: Redis
+      tiers:
+        - default: 100 requests per 60 seconds
+        - strict (login): 5 requests per 60 seconds
+        - orders: 30 requests per 60 seconds
+        - inventory: 50 requests per 60 seconds
+      behavior:
+        - Returns 429 Too Many Requests when exceeded
+        - Per-IP tracking
+        - Sliding window algorithm
+      prevents: Abuse, DoS attacks
+      
+    - mechanism: Request Idempotency
+      implementation: Transaction.idempotencyKey (unique constraint)
+      behavior:
+        - OrdersController checks for existing transaction before processing
+        - Returns cached result if idempotencyKey already exists
+        - Logs idempotency check via AuditService
+      usage: POST /orders endpoint
+      prevents: Double-charging on network retry
+      
+    - mechanism: Database Row-Level Locking
+      implementation: InventoryAgent.checkAndReserve()
+      technique: SELECT FOR UPDATE in Prisma transaction
+      behavior:
+        - Locks inventory row during reservation
+        - Atomic quantity check and update
+        - Prevents race conditions
+        - Automatic rollback on transaction failure
+      prevents: Overselling when multiple cashiers access same product
+      
+    - mechanism: Automated Backups
+      implementation: backend/src/backup/backup.service.ts
+      schedule:
+        - Daily full backup at 2 AM (Cron: '0 2 * * *')
+        - Hourly WAL archiving (Cron: EVERY_HOUR)
+      features:
+        - PostgreSQL pg_dump with custom format
+        - Checksum verification (SHA-256)
+        - Retention policy (default: 30 days)
+        - Metadata tracking (size, timestamp, status)
+        - S3 upload support (if BACKUP_S3_ENABLED=true)
+      storage: ./backend/backups/ directory
+      cleanup: Automatic removal of backups older than retention period
+      verification: Validates backup integrity before marking complete
+      alerts: Sends alert on backup failure
+      
+    - mechanism: Health Check Endpoints
+      implementation: backend/src/health/health.controller.ts
+      endpoints:
+        - GET /health: Full system health (DB, Redis, memory, disk)
+        - GET /health/ready: Readiness probe (DB + Redis only)
+        - GET /health/live: Liveness probe (memory check only)
+        - GET /health/db: Database-specific health
+        - GET /health/redis: Redis-specific health
+        - GET /health/backup: Backup system health
+      kubernetes_ready: true (separate readiness/liveness probes)
+      thresholds:
+        - memory_heap: 300MB (health), 500MB (liveness)
+        - memory_rss: 500MB
+        - disk: 90% usage threshold
+      behavior:
+        - Returns 200 OK when healthy
+        - Returns 503 Service Unavailable when unhealthy
+        - Includes detailed status for each subsystem
+      
+    - mechanism: Graceful Degradation (Offline Mode)
+      implementation: OfflinePaymentAgent + OfflineQueueService
+      triggers:
+        - Stripe API unavailable (NetworkStatusService detects)
+        - Network connectivity lost
+      behavior:
+        - Authorizes payment locally (offline mode)
+        - Queues payment capture for later
+        - Continues accepting transactions
+        - Syncs when network restored
+      limitations:
+        - Card payments require online capture later
+        - Cash payments unaffected
+      feature_flag: ENABLE_OFFLINE_MODE (default: true)
+      
+    - mechanism: CSRF Protection
+      implementation: backend/src/main.ts (middleware)
+      pattern: Double Submit Cookie
+      behavior:
+        - Generates CSRF token on first request
+        - Sets csrf-token cookie (httpOnly: false, readable by JS)
+        - Validates x-csrf-token header on POST/PUT/PATCH/DELETE
+        - Returns 403 Forbidden on mismatch
+      exemptions: Webhook endpoints (use signature verification instead)
+      
+    - mechanism: JWT Token Revocation
+      implementation: JwtAuthGuard + RedisService
+      behavior:
+        - Blacklists JWT in Redis on logout
+        - Checks blacklist before accepting token
+        - TTL matches JWT expiry (8 hours)
+      prevents: Using logged-out tokens
+
+  # ============================================================================
+  # 2. OBSERVABILITY
+  # ============================================================================
+  observability:
+    
+    logging:
+      
+      - component: Structured Logging (Winston)
+        implementation: backend/src/common/logger.service.ts
+        features:
+          - Multiple log levels (debug, info, warn, error, verbose)
+          - Structured JSON format in production
+          - Human-readable format in development
+          - Correlation ID tracking (via CLS namespace)
+          - Context tagging (service name, component)
+          - Metadata support (arbitrary key-value pairs)
+        transports:
+          - Console: Always enabled, colorized in dev
+          - Daily Rotate File: Production only, 14-day retention for combined, 30-day for errors
+          - Loki: Optional, if lokiEnabled=true and lokiUrl configured
+        log_levels:
+          - Configurable via LOG_LEVEL environment variable
+          - Default: info
+        log_locations:
+          - stdout/stderr (Docker logs)
+          - ./logs/combined-YYYY-MM-DD.log (production)
+          - ./logs/error-YYYY-MM-DD.log (production)
+          - Loki (if enabled)
+        rotation:
+          - Max size: 20MB per file
+          - Date pattern: YYYY-MM-DD
+          - Automatic cleanup after retention period
+        
+      - component: HTTP Request Logging
+        implementation: backend/src/main.ts (middleware)
+        captures:
+          - Method, URL, status code, duration
+          - User (from JWT or 'anonymous')
+          - IP address
+          - Correlation ID
+        log_levels:
+          - ERROR: status >= 500
+          - WARN: status >= 400
+          - INFO: status < 400
+        format: "METHOD URL STATUS DURATIONms"
+        
+      - component: Loki Integration
+        implementation: backend/src/common/logger/loki-transport.ts
+        features:
+          - Batched log shipping (reduces network overhead)
+          - Circuit breaker protection (prevents log storms)
+          - Automatic retry with exponential backoff
+          - Label-based indexing (service, location, environment)
+        configuration:
+          - lokiUrl: Loki server URL
+          - lokiEnabled: Feature flag
+          - lokiBatchInterval: 5000ms (default)
+          - lokiMaxBatchSize: 100 logs (default)
+          - lokiMaxRetries: 3
+        circuit_breaker:
+          - Opens after 5 failures
+          - Timeout: 30 seconds
+          - Prevents cascading failures to logging infrastructure
+        fallback: Logs to console if Loki unavailable
+        
+      - component: Audit Logging
+        implementation: AuditLog table + AuditService
+        events_tracked:
+          - PAYMENT_ACCESS
+          - AGE_VERIFICATION
+          - PRICE_OVERRIDE
+          - ORDER_CREATION
+          - IDEMPOTENCY_CHECK
+        fields:
+          - eventType, userId, action, resourceId
+          - timestamp, ipAddress, userAgent
+          - result (success/failure)
+          - details (encrypted JSON)
+        encryption: AES-256-GCM (AUDIT_LOG_ENCRYPTION_KEY)
+        immutability: Database-level constraints prevent modification
+        retention: No automatic cleanup (compliance requirement)
+    
+    metrics:
+      
+      - component: Business Metrics
+        implementation: backend/src/monitoring/business-metrics.service.ts
+        metrics_tracked:
+          - orders_completed_total (counter)
+          - orders_failed_total (counter)
+          - order_value_dollars (histogram)
+          - items_sold_total (counter)
+          - payment_success_total (counter)
+          - payment_failures_total (counter)
+          - payment_amount_dollars (histogram)
+          - payment_duration_ms (histogram)
+          - refunds_total (counter)
+          - refund_amount_dollars (histogram)
+          - inventory_out_of_stock_total (counter)
+          - customers_registered_total (counter)
+          - loyalty_redemptions_total (counter)
+          - loyalty_points_redeemed (histogram)
+        labels:
+          - location, channel, payment_method, reason
+        aggregation:
+          - Counters reset hourly
+          - Histograms track distribution
+        alerting:
+          - Order failure rate > threshold
+          - Payment failure rate > threshold
+          - Zero revenue during business hours (8 AM - 10 PM)
+        checks:
+          - Failure rate calculated every operation
+          - Zero revenue check every 15 minutes
+        
+      - component: System Metrics
+        implementation: backend/src/monitoring/metrics.service.ts
+        metrics_tracked:
+          - http_requests_total (counter)
+          - http_request_duration_ms (histogram)
+          - database_query_duration_ms (histogram)
+          - redis_operations_total (counter)
+          - redis_hit_rate (gauge)
+          - stripe_api_calls_total (counter)
+          - stripe_api_duration_ms (histogram)
+        storage: In-memory (MetricsService)
+        export: Prometheus-compatible format (if enabled)
+        
+      - component: Cache Metrics
+        implementation: RedisService.getMetrics()
+        metrics:
+          - hits, misses, sets, deletes, errors
+          - hit rate calculation
+        access: GET /health/redis endpoint
+        
+      - component: Queue Metrics
+        implementation: OfflineQueueService.getMetrics()
+        metrics:
+          - pending, processing, completed, failed counts
+          - total processed
+          - success rate
+        access: Via OfflineQueueService.getMetrics() method
+    
+    tracing:
+      
+      - component: Correlation ID Middleware
+        implementation: backend/src/common/correlation-id.middleware.ts
+        behavior:
+          - Extracts correlation ID from headers (x-correlation-id, x-request-id)
+          - Generates UUID if not provided
+          - Stores in CLS (continuation-local-storage) namespace
+          - Adds to all log entries
+          - Returns in response headers
+        propagation: Included in all downstream requests
+        
+      - component: Request Context
+        implementation: CLS (cls-hooked) namespace
+        storage: Thread-local storage for async context
+        data_stored:
+          - correlationId
+          - userId (from JWT)
+        access: LoggerService.getCorrelationId()
+        
+      - component: Performance Monitoring
+        implementation: PerformanceInterceptor (if enabled)
+        captures:
+          - Request duration
+          - Database query time
+          - External API call time
+        integration: Sentry (if SENTRY_DSN configured)
+    
+    alerting:
+      
+      - component: Monitoring Service
+        implementation: backend/src/monitoring/monitoring.service.ts
+        alert_types:
+          - business.order_failure_rate
+          - business.payment_failure_rate
+          - business.zero_revenue
+          - system.high_memory
+          - system.high_cpu
+          - system.disk_full
+          - integration.conexxus_down
+          - integration.stripe_down
+        severities:
+          - critical, error, warning, info
+        channels:
+          - Console logs (always)
+          - Sentry (if configured)
+          - Webhook (if configured)
+        alert_rules:
+          - Defined in backend/src/monitoring/alert-rules.ts
+          - Configurable thresholds
+        
+      - component: Alert Rules
+        implementation: backend/src/monitoring/alert-rules.ts
+        rules:
+          - orderFailureRate: threshold 0.1 (10%), severity: error
+          - paymentFailureRate: threshold 0.05 (5%), severity: critical
+          - zeroRevenue: threshold 3600000ms (1 hour), severity: critical
+          - highMemory: threshold 0.9 (90%), severity: warning
+          - diskFull: threshold 0.95 (95%), severity: critical
+    
+    dashboards:
+      
+      - component: API Documentation (Swagger)
+        url: http://localhost:3000/api/docs
+        features:
+          - Interactive API testing
+          - Request/response examples
+          - Authentication testing
+          - Schema documentation
+        persistence: Authorization persists across page reloads
+        
+      - component: Health Check Dashboard
+        endpoints: /health, /health/ready, /health/live
+        format: JSON with detailed subsystem status
+        kubernetes: Separate readiness/liveness probes
+        
+      - component: No Built-in UI Dashboard
+        reality: No Grafana, Prometheus, or custom dashboard
+        workaround: Query metrics via code or build custom dashboard
+        gap: No visual monitoring interface
+
+  # ============================================================================
+  # 3. DEGRADATION BEHAVIOR
+  # ============================================================================
+  degradation_behavior:
+    
+    - scenario: Redis Unavailable
+      trigger: Redis connection fails or times out
+      behavior:
+        - Falls back to in-memory LRU cache (100 entries max)
+        - Logs warning: "running in degraded mode"
+        - Continues serving requests
+        - Session data may be lost on restart
+        - Rate limiting may not work correctly (in-memory counters)
+      impact:
+        - JWT blacklist not shared across instances
+        - Cache not shared across instances
+        - Rate limits not shared across instances
+      recovery: Automatic reconnection when Redis available
+      
+    - scenario: PostgreSQL Unavailable
+      trigger: Database connection fails
+      behavior:
+        - Health check fails (/health returns 503)
+        - All database operations fail
+        - Application does NOT crash (graceful error handling)
+        - Returns 500 Internal Server Error to clients
+      impact:
+        - Cannot process orders
+        - Cannot read products
+        - Cannot authenticate users
+      recovery: Automatic reconnection via Prisma
+      no_fallback: No local database cache
+      
+    - scenario: Stripe API Unavailable
+      trigger: NetworkStatusService detects Stripe down
+      behavior:
+        - OrderOrchestrator checks isStripeAvailable()
+        - Falls back to OfflinePaymentAgent for card payments
+        - Authorizes payment locally (offline mode)
+        - Queues payment capture for later (OfflineQueueService)
+        - Cash payments unaffected
+      impact:
+        - Card payments require online capture later
+        - Risk of authorization expiry
+      recovery: OfflineQueueService processes queue when Stripe available
+      feature_flag: ENABLE_OFFLINE_MODE (default: true)
+      
+    - scenario: Conexxus API Unavailable
+      trigger: Circuit breaker opens after 5 failures
+      behavior:
+        - Circuit breaker fails fast (no API calls)
+        - Returns error immediately
+        - Attempts recovery after 60 seconds (HALF_OPEN state)
+        - Inventory sync operations fail
+      impact:
+        - Cannot sync inventory with back-office
+        - Cannot push sales data
+      recovery: Automatic recovery detection via circuit breaker
+      
+    - scenario: Loki Logging Unavailable
+      trigger: Loki transport fails or circuit breaker opens
+      behavior:
+        - Circuit breaker opens after 5 failures
+        - Falls back to console/file logging
+        - Logs warning: "Loki unavailable"
+        - Application continues normally
+      impact:
+        - Centralized log aggregation unavailable
+        - Logs only in local files
+      recovery: Circuit breaker attempts recovery after 30 seconds
+      
+    - scenario: Network Connectivity Lost
+      trigger: Internet connection fails
+      behavior:
+        - NetworkStatusService detects offline after 2 consecutive failures
+        - Sets isOnline = false
+        - Notifies subscribers
+        - OfflinePaymentAgent activates
+        - OfflineQueueService queues operations
+      impact:
+        - External API calls fail
+        - Card payments queued for later
+        - Webhooks not received
+      recovery: Automatic when network restored (detected every 30s)
+      
+    - scenario: High Memory Usage
+      trigger: Memory heap > 300MB (health check threshold)
+      behavior:
+        - Health check returns degraded status
+        - Logs warning
+        - Alert sent to monitoring system
+        - Application continues running
+      impact:
+        - Performance degradation
+        - Risk of OOM crash
+      no_automatic_action: Does not restart or reduce load
+      
+    - scenario: Disk Space Full
+      trigger: Disk usage > 90%
+      behavior:
+        - Health check returns degraded status
+        - Logs error
+        - Alert sent to monitoring system
+        - Backup operations may fail
+        - Log rotation may fail
+      impact:
+        - Cannot write logs
+        - Cannot create backups
+        - Database writes may fail
+      no_automatic_action: Does not clean up files
+      
+    - scenario: Rate Limit Exceeded
+      trigger: Client exceeds rate limit
+      behavior:
+        - Returns 429 Too Many Requests
+        - Includes Retry-After header
+        - Logs warning
+        - Client must back off
+      impact:
+        - Requests rejected
+        - Client must implement retry logic
+      no_queuing: Requests not queued, immediately rejected
+
+  # ============================================================================
+  # 4. OPERATIONAL ASSUMPTIONS
+  # ============================================================================
+  operational_assumptions:
+    
+    - assumption: Docker Environment
+      reality: System designed for Docker Compose deployment
+      dependencies:
+        - Docker Desktop installed
+        - docker-compose.yml orchestration
+        - Volume persistence for data
+      manual_deployment:
+        - Requires Node.js 22+, PostgreSQL 16+, Redis 7+
+        - Manual service management
+        - No provided systemd units
+      
+    - assumption: Single-Instance Deployment
+      reality: No clustering or load balancing built-in
+      implications:
+        - In-memory cache not shared
+        - Rate limits not shared
+        - No horizontal scaling
+      workaround: Deploy multiple instances with shared Redis/PostgreSQL
+      
+    - assumption: Persistent Volumes
+      reality: Data stored in Docker volumes
+      volumes:
+        - postgres_data: Database files
+        - redis_data: Redis persistence (AOF)
+        - backend_logs: Application logs
+      risk: Volume loss = data loss
+      backup: Automated backups to ./backend/backups/
+      
+    - assumption: Secrets in Environment Variables
+      reality: Sensitive data in .env file
+      secrets:
+        - JWT_SECRET (64-byte hex)
+        - AUDIT_LOG_ENCRYPTION_KEY (32-byte base64)
+        - DB_PASSWORD
+        - REDIS_PASSWORD
+        - STRIPE_SECRET_KEY
+      risk: .env file must be secured (not in git)
+      rotation: No automatic secret rotation
+      
+    - assumption: Manual Secret Generation
+      reality: Secrets generated via Node.js commands
+      process:
+        - node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+        - Copy to .env file
+      risk: Weak secrets if not properly generated
+      
+    - assumption: Business Hours (8 AM - 10 PM)
+      reality: Zero revenue alert only during these hours
+      hardcoded: In BusinessMetricsService.checkZeroRevenue()
+      issue: Not configurable per location
+      
+    - assumption: Florida Tax Rate (7%)
+      reality: Hardcoded in frontend CartLogic.ts
+      issue: Should fetch from Location.taxRate
+      impact: Multi-location deployments with different tax rates won't work
+      
+    - assumption: Single Location per Frontend Instance
+      reality: VITE_LOCATION_ID and VITE_TERMINAL_ID hardcoded at build time
+      issue: Cannot switch locations without rebuild
+      impact: Need separate frontend build per location
+      
+    - assumption: Stripe for Card Payments
+      reality: No alternative payment processors
+      dependency: STRIPE_SECRET_KEY required for card payments
+      fallback: OfflinePaymentAgent if Stripe unavailable
+      
+    - assumption: PostgreSQL 16+
+      reality: Uses Prisma with pg adapter
+      features: Row-level locking, WAL archiving, custom format dumps
+      compatibility: May not work with older PostgreSQL versions
+      
+    - assumption: Redis 7+
+      reality: Uses ioredis client
+      features: AOF persistence, LRU eviction, Sentinel support
+      compatibility: May not work with older Redis versions
+      
+    - assumption: Node.js 22+
+      reality: package.json specifies engines.node >= 22.0.0
+      features: Modern JavaScript features, performance improvements
+      compatibility: Will not run on older Node.js versions
+      
+    - assumption: HTTPS in Production
+      reality: Optional SSL configuration (SSL_KEY_PATH, SSL_CERT_PATH)
+      default: HTTP only
+      security: Must configure HTTPS for production
+      
+    - assumption: CORS Origins Configured
+      reality: ALLOWED_ORIGINS environment variable
+      default: http://localhost,http://localhost:80
+      security: Must configure for production domains
+      
+    - assumption: Backup Storage Capacity
+      reality: Backups stored in ./backend/backups/
+      retention: 30 days (default)
+      cleanup: Automatic via cron job
+      risk: Disk space exhaustion if backups grow large
+      
+    - assumption: Log Retention
+      reality: 14 days for combined logs, 30 days for error logs
+      rotation: Daily rotate, max 20MB per file
+      cleanup: Automatic via winston-daily-rotate-file
+      
+    - assumption: Monitoring System External
+      reality: Alerts sent to console/Sentry/webhook
+      no_builtin: No built-in alerting dashboard
+      integration: Requires external monitoring (PagerDuty, Slack, etc.)
+
+  # ============================================================================
+  # 5. MISSING PROTECTIONS
+  # ============================================================================
+  missing_protections:
+    
+    - protection: Distributed Tracing
+      gap: No OpenTelemetry or Jaeger integration
+      impact: Cannot trace requests across services
+      workaround: Correlation IDs in logs
+      
+    - protection: Metrics Export
+      gap: No Prometheus exporter
+      impact: Cannot scrape metrics for dashboards
+      workaround: Query MetricsService directly
+      
+    - protection: Automatic Scaling
+      gap: No auto-scaling based on load
+      impact: Cannot handle traffic spikes
+      workaround: Manual horizontal scaling
+      
+    - protection: Load Balancing
+      gap: No built-in load balancer
+      impact: Single point of failure
+      workaround: Deploy behind nginx/HAProxy
+      
+    - protection: Service Mesh
+      gap: No Istio or Linkerd
+      impact: No advanced traffic management
+      workaround: Manual service discovery
+      
+    - protection: Secret Management
+      gap: No Vault or AWS Secrets Manager integration
+      impact: Secrets in .env file
+      workaround: Manual secret rotation
+      
+    - protection: Automatic Failover
+      gap: No automatic database failover (except Redis Sentinel)
+      impact: Manual intervention required for PostgreSQL failure
+      workaround: Use managed PostgreSQL (RDS, Cloud SQL)
+      
+    - protection: Chaos Engineering
+      gap: No chaos testing framework
+      impact: Unknown failure modes
+      workaround: Manual failure injection
+      
+    - protection: Canary Deployments
+      gap: No gradual rollout mechanism
+      impact: All-or-nothing deployments
+      workaround: Manual blue-green deployment
+      
+    - protection: Feature Flags
+      gap: Limited feature flags (only ENABLE_OFFLINE_MODE, ENABLE_AI_FEATURES)
+      impact: Cannot toggle features without redeployment
+      workaround: Environment variables + restart
+      
+    - protection: Request Replay Protection
+      gap: Only idempotency for orders, not all endpoints
+      impact: Duplicate requests may succeed
+      workaround: Implement idempotency keys per endpoint
+      
+    - protection: DDoS Protection
+      gap: Only basic rate limiting
+      impact: Vulnerable to sophisticated DDoS
+      workaround: Deploy behind Cloudflare/AWS WAF
+      
+    - protection: Data Encryption at Rest
+      gap: Only audit logs encrypted, not all data
+      impact: Database files not encrypted
+      workaround: Use encrypted volumes or managed databases
+      
+    - protection: Backup Verification
+      gap: Checksum verification exists, but no restore testing
+      impact: Backups may be corrupted
+      workaround: Manual periodic restore tests
+      
+    - protection: Dependency Vulnerability Scanning
+      gap: No Snyk or Dependabot integration visible
+      impact: Vulnerable dependencies may exist
+      workaround: Manual npm audit
+      
+    - protection: Container Image Scanning
+      gap: No Trivy or Clair scanning
+      impact: Vulnerable base images may be used
+      workaround: Manual docker scan
+      
+    - protection: Compliance Auditing
+      gap: Audit logs exist but no compliance dashboard
+      impact: Manual compliance verification
+      workaround: Query AuditLog table directly
+      
+    - protection: Anomaly Detection
+      gap: No ML-based anomaly detection
+      impact: Unusual patterns not automatically detected
+      workaround: Manual log analysis
+      
+    - protection: Synthetic Monitoring
+      gap: No synthetic transactions or uptime monitoring
+      impact: Downtime not detected until user reports
+      workaround: External uptime monitoring (Pingdom, UptimeRobot)
+      
+    - protection: Database Query Optimization
+      gap: No query performance monitoring
+      impact: Slow queries not detected
+      workaround: Manual EXPLAIN ANALYZE
+      
+    - protection: Memory Leak Detection
+      gap: No heap dump analysis
+      impact: Memory leaks not detected until crash
+      workaround: Manual heap profiling
+
+# ==============================================================================
+# END OF OBSERVED NON-FUNCTIONAL CHARACTERISTICS
+# ==============================================================================
+

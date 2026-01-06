@@ -1,0 +1,116 @@
+.problem-recognition {
+  padding: var(--spacing-2xl) var(--spacing-md);
+  background-color: var(--color-bg);
+}
+
+.section-subtitle {
+  text-align: center;
+  font-size: 19px;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xl);
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pain-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.pain-card {
+  background: white;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.pain-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pain-card:hover {
+  border-color: var(--color-warning);
+  box-shadow: 0 12px 40px rgba(255, 149, 0, 0.15);
+  transform: translateY(-8px);
+}
+
+.pain-card:nth-child(1) { transition-delay: 0.1s; }
+.pain-card:nth-child(2) { transition-delay: 0.2s; }
+.pain-card:nth-child(3) { transition-delay: 0.3s; }
+.pain-card:nth-child(4) { transition-delay: 0.4s; }
+.pain-card:nth-child(5) { transition-delay: 0.5s; }
+.pain-card:nth-child(6) { transition-delay: 0.6s; }
+
+.pain-icon {
+  font-size: 40px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.pain-card h3 {
+  font-size: 21px;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pain-description {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.pain-impact {
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-warning);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: rgba(255, 149, 0, 0.1);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-warning);
+}
+
+.pain-summary {
+  text-align: center;
+  padding: var(--spacing-lg);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.pain-summary p {
+  font-size: 17px;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.pain-summary p:last-child {
+  margin-bottom: 0;
+}
+
+.pain-summary strong {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pain-cta-text {
+  font-size: 21px !important;
+  color: var(--color-accent) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  margin-top: var(--spacing-sm) !important;
+}
+
+@media (max-width: 768px) {
+  .pain-points {
+    grid-template-columns: 1fr;
+  }
+}
+

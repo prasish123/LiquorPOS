@@ -3,9 +3,22 @@ import { CreditCard, DollarSign, CheckCircle, AlertCircle, ArrowRight } from 'lu
 import { useCartStore } from '../store/cartStore';
 import { useToastStore } from '../store/toastStore';
 import { api } from '../infrastructure/adapters/ApiClient';
+import { getValidatedConfig } from '../utils/validation';
 
-const LOCATION_ID = import.meta.env.VITE_LOCATION_ID || 'loc-001';
-const TERMINAL_ID = import.meta.env.VITE_TERMINAL_ID || 'terminal-01';
+// Validate configuration on module load
+let LOCATION_ID: string;
+let TERMINAL_ID: string;
+
+try {
+    const config = getValidatedConfig();
+    LOCATION_ID = config.locationId;
+    TERMINAL_ID = config.terminalId;
+} catch (err) {
+    console.error('[CRITICAL] Invalid configuration:', err);
+    // Fallback to invalid values that will be caught by backend
+    LOCATION_ID = import.meta.env.VITE_LOCATION_ID || 'INVALID-LOCATION-ID';
+    TERMINAL_ID = import.meta.env.VITE_TERMINAL_ID || 'INVALID-TERMINAL-ID';
+}
 
 export function Checkout() {
     const items = useCartStore((state) => state.items);
@@ -63,7 +76,17 @@ export function Checkout() {
                 setAgeVerified(false);
             }, 2000);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Checkout failed');
+            const errorMessage = err instanceof Error ? err.message : 'Checkout failed';
+            setError(errorMessage);
+            
+            // Show toast for critical errors
+            useToastStore.getState().addToast({
+                type: 'error',
+                message: errorMessage,
+                duration: 5000,
+            });
+            
+            console.error('[Checkout Error]', err);
         } finally {
             setProcessing(false);
         }

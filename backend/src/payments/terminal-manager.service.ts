@@ -47,14 +47,14 @@ export interface TerminalHealth {
 
 /**
  * Terminal Manager Service
- * 
+ *
  * Manages the lifecycle of payment terminals including:
  * - Terminal registration and configuration
  * - Health monitoring and status tracking
  * - Terminal discovery and auto-configuration
  * - Failover and redundancy
  * - Terminal assignment to POS stations
- * 
+ *
  * Supports multiple terminal types:
  * - PAX terminals (A920, A80, S300, IM30)
  * - Ingenico terminals (future)
@@ -74,16 +74,14 @@ export class TerminalManagerService implements OnModuleInit {
 
   async onModuleInit() {
     this.logger.log('Terminal Manager Service initializing...');
-    
+
     // Load terminals from database
     await this.loadTerminalsFromDatabase();
-    
+
     // Perform initial health check
     await this.performHealthCheck();
-    
-    this.logger.log(
-      `Terminal Manager initialized with ${this.terminals.size} terminals`,
-    );
+
+    this.logger.log(`Terminal Manager initialized with ${this.terminals.size} terminals`);
   }
 
   /**
@@ -154,10 +152,7 @@ export class TerminalManagerService implements OnModuleInit {
   /**
    * Update terminal configuration
    */
-  async updateTerminal(
-    terminalId: string,
-    updates: Partial<TerminalConfig>,
-  ): Promise<void> {
+  async updateTerminal(terminalId: string, updates: Partial<TerminalConfig>): Promise<void> {
     this.logger.log(`Updating terminal: ${terminalId}`);
 
     const terminal = this.terminals.get(terminalId);
@@ -222,9 +217,7 @@ export class TerminalManagerService implements OnModuleInit {
    * Get terminals by location
    */
   getTerminalsByLocation(locationId: string): TerminalConfig[] {
-    return Array.from(this.terminals.values()).filter(
-      (t) => t.locationId === locationId,
-    );
+    return Array.from(this.terminals.values()).filter((t) => t.locationId === locationId);
   }
 
   /**
@@ -324,16 +317,10 @@ export class TerminalManagerService implements OnModuleInit {
     this.logger.debug('Performing health check on all terminals');
 
     const terminals = Array.from(this.terminals.keys());
-    const results = await Promise.allSettled(
-      terminals.map((id) => this.checkTerminalHealth(id)),
-    );
+    const results = await Promise.allSettled(terminals.map((id) => this.checkTerminalHealth(id)));
 
-    const healthy = results.filter(
-      (r) => r.status === 'fulfilled' && r.value.healthy,
-    ).length;
-    const unhealthy = results.filter(
-      (r) => r.status === 'fulfilled' && !r.value.healthy,
-    ).length;
+    const healthy = results.filter((r) => r.status === 'fulfilled' && r.value.healthy).length;
+    const unhealthy = results.filter((r) => r.status === 'fulfilled' && !r.value.healthy).length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
     this.logger.log(
@@ -355,9 +342,7 @@ export class TerminalManagerService implements OnModuleInit {
     }
 
     // Filter by preferred type if specified
-    let candidates = preferredType
-      ? terminals.filter((t) => t.type === preferredType)
-      : terminals;
+    let candidates = preferredType ? terminals.filter((t) => t.type === preferredType) : terminals;
 
     if (candidates.length === 0) {
       candidates = terminals; // Fallback to all available terminals
@@ -437,9 +422,7 @@ export class TerminalManagerService implements OnModuleInit {
           model: terminal.model || undefined,
           firmwareVersion: terminal.firmwareVersion || undefined,
           lastHeartbeat: terminal.lastHeartbeat || undefined,
-          metadata: terminal.metadata
-            ? JSON.parse(terminal.metadata as string)
-            : undefined,
+          metadata: terminal.metadata ? JSON.parse(terminal.metadata) : undefined,
         };
 
         this.terminals.set(config.id, config);
@@ -544,4 +527,3 @@ export class TerminalManagerService implements OnModuleInit {
     };
   }
 }
-

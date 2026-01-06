@@ -4,13 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { RedisService } from '../redis/redis.service';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
-import {
-  LoginDto,
-  LoginResponse,
-  JwtPayload,
-  UserPayload,
-  ValidatedUser,
-} from './dto/auth.dto';
+import { LoginDto, LoginResponse, JwtPayload, UserPayload, ValidatedUser } from './dto/auth.dto';
 import { User } from '@prisma/client';
 import { AuthenticationException, ErrorCode } from '../common/errors';
 
@@ -24,10 +18,7 @@ export class AuthService {
     private redisService: RedisService,
   ) {}
 
-  async validateUser(
-    username: string,
-    pass: string,
-  ): Promise<UserWithoutPassword | null> {
+  async validateUser(username: string, pass: string): Promise<UserWithoutPassword | null> {
     const user = await this.prisma.user.findUnique({
       where: { username },
     });

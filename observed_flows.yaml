@@ -1,0 +1,687 @@
+# ==============================================================================
+# OBSERVED USER FLOWS - LIQUOR POS
+# ==============================================================================
+# Generated: 2026-01-05
+# Perspective: Real-world store operator (QA Lead + Retail)
+# Focus: What actually works vs. what might break
+# ==============================================================================
+
+observed_flows:
+
+  # ============================================================================
+  # ROLE: CASHIER
+  # ============================================================================
+  cashier:
+    
+    accessible_screens:
+      - screen: Login Page
+        path: /login
+        access: Public (no auth required)
+        
+      - screen: POS Terminal
+        path: /pos
+        access: Protected (requires CASHIER, MANAGER, or ADMIN role)
+        components:
+          - ProductSearch (search bar + category tiles)
+          - Cart (current order items)
+          - Checkout (payment method + age verification)
+        
+      - screen: Admin Panel
+        path: /admin/*
+        access: BLOCKED (ProtectedRoute redirects to /pos)
+        behavior: If cashier tries to access, redirected to POS terminal
+    
+    allowed_actions:
+      
+      - action: Login
+        steps:
+          1. Enter username (e.g., "cashier")
+          2. Enter password (e.g., "password123")
+          3. System fetches CSRF token
+          4. System validates credentials
+          5. System sets HttpOnly cookie
+          6. Redirects to /pos
+        rate_limit: 5 attempts per 60 seconds
+        blockers:
+          - CRITICAL: Backend must be running and healthy
+          - CRITICAL: CSRF token endpoint must respond
+          - Network connectivity required
+          - Correct credentials required (case-sensitive)
+        
+      - action: Search Products
+        methods:
+          - Type in search bar (300ms debounce)
+          - Click category tile (All, Whiskey, Vodka, Beer, Wine, etc.)
+        behavior:
+          - Searches by name, SKU, description (ILIKE query)
+          - Results appear in grid below
+          - Shows: product name, SKU, price, 21+ badge if age-restricted
+        blockers:
+          - Backend API must be reachable
+          - Products must exist in database (seeded or added)
+          - Empty results if no match
+        assumptions:
+          - Search is case-insensitive
+          - Category filter is client-side (filters already-loaded results)
+          - No pagination (all results load at once)
+        
+      - action: Add Item to Cart
+        steps:
+          1. Click product card in search results
+          2. Product added to cart with quantity=1
+          3. Toast notification appears
+          4. If already in cart, quantity increments
+        protection:
+          - Double-click prevention (500ms debounce per SKU)
+          - Prevents duplicate adds from rapid clicking
+        blockers:
+          - None (client-side operation)
+        
+      - action: Modify Cart Quantities
+        steps:
+          - Click + button to increment
+          - Click - button to decrement (removes if quantity reaches 0)
+          - Click trash icon to remove item entirely
+          - Click "Clear All" to empty cart (requires confirmation)
+        blockers:
+          - None (client-side operation)
+        
+      - action: Complete Sale (Cash)
+        steps:
+          1. Select "Cash" payment method
+          2. If cart has alcohol, check "Age Verified" checkbox
+          3. Click "Complete Sale" button
+          4. Frontend sends POST /orders with order data
+          5. Backend processes via OrderOrchestrator (SAGA pattern)
+          6. Success toast appears
+          7. Cart clears after 2 seconds
+        requirements:
+          - Cart must have at least 1 item
+          - Age verification REQUIRED if any item has ageRestricted=true
+          - VITE_LOCATION_ID and VITE_TERMINAL_ID must be set in frontend env
+        blockers:
+          - CRITICAL: Age verification checkbox must be checked for alcohol
+          - CRITICAL: Backend must be reachable
+          - CRITICAL: Inventory must be available (not oversold)
+          - Rate limit: 30 orders per 60 seconds per terminal
+          - Network errors will fail transaction
+        assumptions:
+          - Tax rate hardcoded at 7% in CartLogic (Florida default)
+          - Frontend calculates subtotal, tax, total (backend trusts these values)
+          - Cash payments always succeed (no external validation)
+        
+      - action: Complete Sale (Card)
+        steps:
+          1. Select "Card" payment method
+          2. If cart has alcohol, check "Age Verified" checkbox
+          3. Click "Complete Sale" button
+          4. Frontend sends POST /orders with paymentMethod="card"
+          5. Backend attempts Stripe Payment Intent
+          6. If Stripe unavailable, falls back to OfflinePaymentAgent
+          7. Success toast appears
+          8. Cart clears after 2 seconds
+        requirements:
+          - Same as cash, plus:
+          - STRIPE_SECRET_KEY must be configured in backend
+          - Stripe API must be reachable
+        blockers:
+          - CRITICAL: Stripe configuration required for card payments
+          - CRITICAL: If Stripe down and offline mode disabled, payment fails
+          - Network latency affects payment speed (30s timeout)
+          - Card may be declined by Stripe
+        offline_behavior:
+          - System queues transaction for later processing
+          - Payment marked as "requires online capture"
+          - Syncs when network restored
+        
+      - action: Logout
+        steps:
+          1. Click logout (if visible in UI)
+          2. System calls POST /auth/logout with CSRF token
+          3. JWT blacklisted in Redis
+          4. Cookie cleared
+          5. Redirected to /login
+        blockers:
+          - None (always succeeds, even if backend call fails)
+    
+    blocked_actions:
+      - Price overrides (requires manager PIN)
+      - User management
+      - Product management
+      - Inventory adjustments
+      - System settings
+      - Backup operations
+      - Accessing /admin routes
+    
+    end_to_end_flows:
+      
+      - flow: Happy Path - Cash Sale with Alcohol
+        scenario: Customer buys 2 bottles of wine with cash
+        steps:
+          1. Cashier logs in (username: cashier, password: password123)
+          2. Cashier searches "wine" in search bar
+          3. Cashier clicks "Cabernet Sauvignon 2020" product card
+          4. Product added to cart (quantity: 1, price: $24.99)
+          5. Cashier clicks + button to increase quantity to 2
+          6. Cart shows: Subtotal $49.98, Tax $3.50, Total $53.48
+          7. Cashier checks customer ID (21+)
+          8. Cashier checks "Age Verified" checkbox
+          9. Cashier selects "Cash" payment method
+          10. Cashier clicks "Complete Sale"
+          11. Backend processes order (inventory check → pricing → compliance → payment → transaction)
+          12. Success toast: "Transaction complete!"
+          13. Cart clears after 2 seconds
+          14. Ready for next customer
+        duration: ~30 seconds
+        success_conditions:
+          - Backend healthy
+          - Inventory available (quantity >= 2)
+          - Age verification checked
+          - Network connectivity
+        
+      - flow: Error Path - Forgot Age Verification
+        scenario: Cashier tries to sell alcohol without checking age
+        steps:
+          1. Cashier adds wine to cart
+          2. Cashier does NOT check "Age Verified" checkbox
+          3. Cashier clicks "Complete Sale"
+          4. Button is DISABLED (canCheckout = false)
+        result: Sale blocked at UI level
+        message: No error shown, button simply disabled
+        issue: USABILITY - No clear indication WHY button is disabled
+        
+      - flow: Error Path - Out of Stock
+        scenario: Product has 0 inventory
+        steps:
+          1. Cashier adds product to cart
+          2. Cashier clicks "Complete Sale"
+          3. Backend InventoryAgent checks availability
+          4. Throws BadRequestException: "Insufficient inventory"
+          5. Frontend shows error toast
+          6. Cart remains populated
+        result: Transaction fails, cashier must remove item or wait for restock
+        
+      - flow: Error Path - Network Failure During Payment
+        scenario: Internet drops mid-transaction
+        steps:
+          1. Cashier completes checkout
+          2. Frontend sends POST /orders
+          3. Network error (timeout or connection refused)
+          4. Frontend catches error, shows toast: "Checkout failed"
+          5. Cart remains populated
+        result: Transaction NOT saved, customer not charged
+        issue: CRITICAL - No offline queue on frontend, transaction lost
+        workaround: Cashier must retry when network restored
+        
+      - flow: Edge Case - Double Click on Checkout
+        scenario: Cashier rapidly clicks "Complete Sale" button
+        steps:
+          1. Cashier clicks "Complete Sale"
+          2. Button sets processing=true (disables button)
+          3. Second click ignored (button disabled)
+        result: Only 1 transaction created
+        protection: processing state + disabled button
+        note: Fixed in RED-001 (double-click bug)
+    
+    brittle_behaviors:
+      
+      - behavior: Hardcoded Tax Rate
+        issue: Tax rate is 7% in CartLogic.ts (frontend)
+        reality: Should fetch from Location.taxRate (backend)
+        impact: If store has different tax rate, calculations wrong
+        workaround: Manually edit CartLogic.ts
+        
+      - behavior: Missing Environment Variables
+        issue: If VITE_LOCATION_ID or VITE_TERMINAL_ID not set, checkout fails
+        error: "INVALID-LOCATION-ID" sent to backend
+        impact: Backend may reject or create transaction with invalid location
+        detection: Validation on module load, logs to console
+        
+      - behavior: Age Verification is Checkbox Only
+        issue: No ID scanner integration
+        reality: Cashier manually checks ID, then checks box
+        compliance_risk: Relies on cashier diligence, no audit trail of ID scan
+        
+      - behavior: No Receipt Printing from Frontend
+        issue: Receipt generation exists (POST /receipts/:transactionId/generate)
+        reality: Frontend doesn't call it after checkout
+        impact: Cashiers cannot print receipts from POS terminal
+        workaround: Admin must access backend API directly
+        
+      - behavior: Search Loads All Products
+        issue: No pagination on product search
+        impact: If catalog has 10,000+ products, slow initial load
+        current: Works fine for small stores (<1000 products)
+        
+      - behavior: Cart State Lost on Refresh
+        issue: Cart stored in Zustand (memory only)
+        impact: Browser refresh clears cart
+        workaround: Don't refresh during active sale
+
+  # ============================================================================
+  # ROLE: MANAGER
+  # ============================================================================
+  manager:
+    
+    accessible_screens:
+      - screen: Login Page
+        path: /login
+        access: Public
+        
+      - screen: POS Terminal
+        path: /pos
+        access: Protected (MANAGER role allowed)
+        
+      - screen: Admin Panel
+        path: /admin/*
+        access: Protected (MANAGER role allowed)
+        sub_screens:
+          - /admin (Dashboard with stats - MOCK DATA)
+          - /admin/products (Product catalog - MOCK DATA)
+          - /admin/users (User management - MOCK DATA)
+          - /admin/settings (System settings - MOCK DATA)
+    
+    allowed_actions:
+      
+      - action: All Cashier Actions
+        inheritance: Manager can do everything cashier can do
+        
+      - action: Price Override Authorization
+        trigger: Cashier requests price override (not visible in current UI)
+        steps:
+          1. Cashier triggers override request (mechanism unclear)
+          2. ManagerOverride modal appears
+          3. Manager enters 4-6 digit PIN
+          4. Manager enters new price
+          5. Manager selects reason (PRICE_MATCH, DAMAGED_GOODS, CUSTOMER_SATISFACTION, OTHER)
+          6. If OTHER, manager enters reason notes
+          7. Manager clicks "Approve Override"
+          8. Backend validates PIN via PinAuthService
+          9. Backend validates manager role (MANAGER or ADMIN)
+          10. Backend creates PriceOverride record
+          11. Backend updates transaction item price
+          12. Backend logs to AuditLog
+        blockers:
+          - CRITICAL: PIN must be correct (hashed comparison)
+          - CRITICAL: User must have MANAGER or ADMIN role
+          - Override price cannot be negative
+          - Warns if discount > 50% (but allows)
+        issue: INTEGRATION - ManagerOverride component exists but not integrated into POS flow
+        
+      - action: Access Admin Panel
+        steps:
+          1. Manager logs in
+          2. Redirected to /admin (Dashboard)
+          3. Can navigate to Products, Users, Settings tabs
+        reality: ALL DATA IS MOCK (hardcoded in components)
+        blockers:
+          - Products page shows fake data, no backend integration
+          - Users page shows fake data, no backend integration
+          - Dashboard shows fake stats, no backend integration
+          - Settings page is placeholder
+        impact: Admin panel is UI-only, no actual functionality
+        
+      - action: Navigate to POS from Admin
+        steps:
+          1. Manager in /admin
+          2. Clicks "Open POS" button in header
+          3. Navigates to /pos
+        blockers: None
+    
+    blocked_actions:
+      - Backup operations (ADMIN only)
+      - Cannot create/edit users (UI exists but not connected)
+      - Cannot create/edit products (UI exists but not connected)
+    
+    end_to_end_flows:
+      
+      - flow: Manager Override (Theoretical)
+        scenario: Customer finds damaged bottle, manager gives discount
+        steps:
+          1. Cashier adds item to cart
+          2. Cashier requests price override (HOW? Not visible in UI)
+          3. ManagerOverride modal appears
+          4. Manager enters PIN (e.g., "5678" for default manager)
+          5. Manager changes price from $29.99 to $20.00
+          6. Manager selects "DAMAGED_GOODS"
+          7. Manager clicks "Approve Override"
+          8. Backend validates and logs
+          9. Transaction proceeds with new price
+        reality: Component exists but not wired into POS flow
+        issue: MISSING INTEGRATION - No way to trigger override from POS UI
+        
+      - flow: Manager Reviews Dashboard
+        scenario: Manager checks daily sales
+        steps:
+          1. Manager logs in
+          2. Lands on /admin dashboard
+          3. Sees stats: Total Sales $1,234.56, Total Orders 45, etc.
+        reality: ALL FAKE DATA (hardcoded in Dashboard.tsx)
+        issue: MOCK DATA - No backend API calls, no real metrics
+        
+      - flow: Manager Tries to Add Product
+        scenario: Manager wants to add new product to catalog
+        steps:
+          1. Manager navigates to /admin/products
+          2. Clicks "Add Product" button
+          3. Nothing happens (no modal, no form)
+        reality: Button is placeholder, no functionality
+        issue: NOT IMPLEMENTED - UI exists but no backend integration
+    
+    brittle_behaviors:
+      
+      - behavior: Admin Panel is Facade
+        issue: All admin screens show mock data
+        reality: Backend APIs exist (GET /api/products, POST /api/products, etc.)
+        gap: Frontend doesn't call backend APIs
+        impact: Managers cannot actually manage products, users, or view real stats
+        
+      - behavior: Price Override Not Accessible
+        issue: ManagerOverride component exists but not integrated
+        reality: Backend endpoint exists (POST /price-overrides)
+        gap: No UI trigger in POS terminal
+        impact: Managers cannot override prices from POS
+        workaround: Must use backend API directly (Postman, curl)
+        
+      - behavior: Manager PIN Not Set During Seed
+        issue: Default manager user has PIN "5678" (from seed.ts)
+        reality: PIN is hashed, but default value known
+        security: Change PIN in production
+        
+      - behavior: No Reporting Functionality
+        issue: Reporting endpoints exist (GET /reporting/sales/daily, etc.)
+        reality: Frontend doesn't call them
+        gap: Managers cannot generate reports from UI
+        workaround: Use backend API directly or export via API docs
+
+  # ============================================================================
+  # ROLE: ADMIN
+  # ============================================================================
+  admin:
+    
+    accessible_screens:
+      - screen: Login Page
+        path: /login
+        access: Public
+        
+      - screen: POS Terminal
+        path: /pos
+        access: Protected (ADMIN role allowed)
+        
+      - screen: Admin Panel
+        path: /admin/*
+        access: Protected (ADMIN role allowed)
+        same_as_manager: Yes (UI is identical for ADMIN and MANAGER)
+    
+    allowed_actions:
+      
+      - action: All Manager Actions
+        inheritance: Admin can do everything manager can do
+        
+      - action: Backup Operations (Backend Only)
+        endpoints:
+          - POST /backup/create
+          - GET /backup/list
+          - POST /backup/restore/:filename
+          - POST /backup/verify/:filename
+        protection: RolesGuard enforces ADMIN role
+        reality: No frontend UI for backups
+        access: Must use backend API directly (curl, Postman, API docs)
+        storage: ./backend/backups/ directory
+        
+      - action: User Management (Backend Only)
+        endpoints:
+          - POST /api/users (create user)
+          - GET /api/users (list users)
+          - PUT /api/users/:id (update user)
+          - DELETE /api/users/:id (delete user)
+        reality: Backend APIs exist, frontend shows mock data
+        gap: Frontend doesn't call backend APIs
+        workaround: Use backend API directly
+        
+      - action: System Configuration (Backend Only)
+        endpoints:
+          - Location management (POST /api/locations, etc.)
+          - Payment terminal management (POST /payments/terminals, etc.)
+        reality: Backend APIs exist, no frontend UI
+        workaround: Use backend API directly
+    
+    blocked_actions:
+      - None (admin has full access to all backend endpoints)
+      - Frontend limitations apply (mock data in admin panel)
+    
+    end_to_end_flows:
+      
+      - flow: Admin Creates Backup
+        scenario: Admin backs up database before maintenance
+        steps:
+          1. Admin opens API docs (http://localhost:3000/api)
+          2. Navigates to /backup/create endpoint
+          3. Clicks "Try it out"
+          4. Executes POST request
+          5. Backend creates PostgreSQL dump
+          6. Returns backup filename
+        reality: Works, but requires API docs access
+        issue: NO FRONTEND UI for backups
+        
+      - flow: Admin Adds New User
+        scenario: Admin hires new cashier, creates account
+        steps:
+          1. Admin opens API docs
+          2. Navigates to POST /api/users endpoint
+          3. Provides JSON body:
+             {
+               "username": "newcashier",
+               "password": "temp123",
+               "firstName": "New",
+               "lastName": "Cashier",
+               "role": "CASHIER"
+             }
+          4. Executes POST request
+          5. Backend creates user with hashed password
+        reality: Works, but requires API docs access
+        issue: Frontend /admin/users shows mock data, no create form
+        
+      - flow: Admin Configures Payment Terminal
+        scenario: Admin registers new PAX terminal
+        steps:
+          1. Admin opens API docs
+          2. Navigates to POST /payments/terminals
+          3. Provides terminal details (IP, port, serial number)
+          4. Executes POST request
+          5. Backend stores in PaymentTerminal table
+        reality: Works, but requires API docs access
+        issue: NO FRONTEND UI for terminal management
+    
+    brittle_behaviors:
+      
+      - behavior: Admin Panel Same as Manager
+        issue: No visual distinction between ADMIN and MANAGER in UI
+        reality: Backend enforces role restrictions (RolesGuard)
+        impact: Admins don't have special UI features
+        
+      - behavior: Critical Operations Require API Access
+        issue: Backups, user management, terminal config have no UI
+        reality: Must use backend API docs or curl
+        impact: Non-technical admins cannot perform these tasks
+        training_required: Admins must learn API usage
+        
+      - behavior: No Audit Log Viewer
+        issue: AuditLog table tracks all sensitive operations
+        reality: No frontend UI to view audit logs
+        workaround: Query database directly or build custom query
+        
+      - behavior: No System Health Dashboard
+        issue: Health endpoints exist (GET /health, /health/db, /health/redis)
+        reality: No frontend UI showing system status
+        workaround: Check endpoints manually or use monitoring tools
+
+  # ============================================================================
+  # CROSS-ROLE OBSERVATIONS
+  # ============================================================================
+  cross_role_observations:
+    
+    - observation: Login Flow is Solid
+      reality: CSRF protection, rate limiting, JWT cookies all work
+      tested: Yes, production-ready
+      
+    - observation: POS Terminal Works for Basic Sales
+      reality: Search, cart, checkout (cash/card) functional
+      tested: Yes, core workflow operational
+      limitations:
+        - No receipt printing from UI
+        - No price override trigger
+        - No customer lookup
+        - No loyalty points
+        
+    - observation: Admin Panel is Placeholder
+      reality: Beautiful UI, zero backend integration
+      impact: Managers/admins cannot manage system from UI
+      workaround: Use backend API docs (http://localhost:3000/api)
+      
+    - observation: Backend is Feature-Complete
+      reality: All APIs implemented and tested
+      gap: Frontend doesn't call most backend APIs
+      examples:
+        - Product management APIs exist, UI doesn't use them
+        - User management APIs exist, UI doesn't use them
+        - Reporting APIs exist, UI doesn't use them
+        - Receipt APIs exist, UI doesn't use them
+        
+    - observation: Offline Mode Exists but Untested
+      reality: OfflinePaymentAgent and OfflineQueueService implemented
+      tested: Unknown, no visible offline indicator
+      concern: Unclear if offline sync actually works
+      
+    - observation: Price Override Component Orphaned
+      reality: ManagerOverride.tsx exists, fully functional
+      issue: Not integrated into POS flow
+      impact: Managers cannot override prices from UI
+      
+    - observation: Age Verification is Manual
+      reality: Checkbox only, no ID scanner
+      compliance: Relies on cashier diligence
+      audit: ComplianceEvent logged in backend
+      risk: No proof of ID scan, just checkbox
+      
+    - observation: Tax Rate Hardcoded in Frontend
+      reality: CartLogic.ts has 7% hardcoded
+      issue: Should fetch from Location.taxRate
+      impact: Multi-location stores with different tax rates won't work
+      
+    - observation: Environment Variables Critical
+      reality: VITE_LOCATION_ID and VITE_TERMINAL_ID required
+      issue: If not set, checkout sends invalid data
+      detection: Validation logs error to console
+      impact: Backend may reject or create invalid transactions
+
+  # ============================================================================
+  # DEPLOYMENT BLOCKERS
+  # ============================================================================
+  deployment_blockers:
+    
+    - blocker: Admin Panel Not Functional
+      severity: HIGH
+      impact: Managers cannot manage products, users, inventory from UI
+      workaround: Use backend API docs
+      recommendation: Connect frontend to backend APIs or document API usage
+      
+    - blocker: No Receipt Printing
+      severity: HIGH
+      impact: Cashiers cannot print receipts for customers
+      workaround: Access backend API directly
+      recommendation: Integrate receipt generation into POS checkout flow
+      
+    - blocker: Price Override Not Accessible
+      severity: MEDIUM
+      impact: Managers cannot override prices from POS
+      workaround: Use backend API directly
+      recommendation: Add "Request Override" button to cart items
+      
+    - blocker: Tax Rate Hardcoded
+      severity: MEDIUM
+      impact: Multi-location deployments with different tax rates won't work
+      workaround: Edit CartLogic.ts for each location
+      recommendation: Fetch tax rate from backend Location API
+      
+    - blocker: No System Health Monitoring
+      severity: MEDIUM
+      impact: Admins cannot see system status (DB, Redis, Stripe health)
+      workaround: Check health endpoints manually
+      recommendation: Add system status dashboard to admin panel
+      
+    - blocker: Environment Variables Not Validated at Build
+      severity: LOW
+      impact: Missing VITE_LOCATION_ID causes runtime errors
+      detection: Console warning, but checkout fails
+      recommendation: Fail build if required env vars missing
+      
+    - blocker: Default Credentials in Seed
+      severity: LOW (dev only)
+      impact: admin/password123 is well-known
+      recommendation: Force password change on first login in production
+
+  # ============================================================================
+  # TESTING RECOMMENDATIONS
+  # ============================================================================
+  testing_recommendations:
+    
+    - test: End-to-End POS Flow
+      scenario: Cashier completes sale with alcohol (cash + card)
+      verify:
+        - Age verification enforced
+        - Inventory decremented
+        - Transaction recorded in database
+        - Payment processed (Stripe for card)
+        - Audit log created
+      
+    - test: Price Override Flow
+      scenario: Manager overrides price with PIN
+      verify:
+        - PIN validation works
+        - Role check enforces MANAGER/ADMIN
+        - PriceOverride record created
+        - AuditLog entry created
+        - Transaction total recalculated
+      blocker: Need to integrate ManagerOverride into POS UI first
+      
+    - test: Offline Mode
+      scenario: Disconnect network, complete sale, reconnect
+      verify:
+        - Transaction queued when offline
+        - Sync occurs when online
+        - Payment captured in Stripe
+        - Inventory updated
+      concern: Unclear if this actually works
+      
+    - test: Multi-Location Tax Rates
+      scenario: Deploy to 2 stores with different tax rates
+      verify:
+        - Each location uses correct tax rate
+      blocker: Tax rate currently hardcoded in frontend
+      
+    - test: Rate Limiting
+      scenario: Attempt 6 logins in 60 seconds
+      verify:
+        - 5th attempt succeeds
+        - 6th attempt blocked with 429 error
+      
+    - test: Inventory Race Condition
+      scenario: 2 cashiers sell last item simultaneously
+      verify:
+        - Only 1 transaction succeeds
+        - Other gets "Insufficient inventory" error
+        - SELECT FOR UPDATE lock prevents overselling
+      
+    - test: Receipt Generation
+      scenario: Complete sale, generate receipt
+      verify:
+        - Receipt stored in database
+        - Plain text and HTML versions created
+        - Reprint increments counter
+      blocker: Need to integrate receipt API into POS UI
+
+# ==============================================================================
+# END OF OBSERVED USER FLOWS
+# ==============================================================================
+

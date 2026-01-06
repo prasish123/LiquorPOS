@@ -1,6 +1,6 @@
 /**
  * E2E Tests for REQ-001: Audit Log Immutability
- * 
+ *
  * Tests that PostgreSQL triggers prevent modification and deletion of audit logs
  * while still allowing creation of new audit logs.
  */
@@ -61,7 +61,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
           result: 'success',
           ipAddress: '192.168.1.1',
           userAgent: 'Mozilla/5.0',
-          details: JSON.stringify({ amount: 100.00, method: 'card' }),
+          details: JSON.stringify({ amount: 100.0, method: 'card' }),
         },
       });
 
@@ -77,7 +77,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
         prisma.auditLog.update({
           where: { id: testAuditLogId },
           data: { result: 'failure' },
-        })
+        }),
       ).rejects.toThrow(/Audit logs are immutable/i);
     });
 
@@ -103,7 +103,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
             action: 'modified',
             details: 'tampered',
           },
-        })
+        }),
       ).rejects.toThrow(/Audit logs are immutable/i);
     });
   });
@@ -113,7 +113,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
       await expect(
         prisma.auditLog.delete({
           where: { id: testAuditLogId },
-        })
+        }),
       ).rejects.toThrow(/Audit logs are immutable/i);
     });
 
@@ -133,7 +133,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
       await expect(
         prisma.auditLog.deleteMany({
           where: { eventType: 'TEST_EVENT' },
-        })
+        }),
       ).rejects.toThrow(/Audit logs are immutable/i);
     });
   });
@@ -235,7 +235,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
         prisma.auditLog.update({
           where: { id: auditLog.id },
           data: { result: 'failure' },
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -251,7 +251,7 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
       await expect(
         prisma.auditLog.delete({
           where: { id: auditLog.id },
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -279,4 +279,3 @@ describe('REQ-001: Audit Log Immutability (e2e)', () => {
     });
   });
 });
-

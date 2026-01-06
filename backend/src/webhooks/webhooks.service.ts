@@ -80,11 +80,7 @@ export class WebhooksService {
   /**
    * Mark webhook event as processed
    */
-  async markEventProcessed(
-    eventId: string,
-    success: boolean,
-    error?: string,
-  ): Promise<void> {
+  async markEventProcessed(eventId: string, success: boolean, error?: string): Promise<void> {
     try {
       await this.prisma.eventLog.update({
         where: { id: eventId },
@@ -97,9 +93,7 @@ export class WebhooksService {
         },
       });
 
-      this.logger.log(
-        `Marked webhook event ${eventId} as ${success ? 'processed' : 'failed'}`,
-      );
+      this.logger.log(`Marked webhook event ${eventId} as ${success ? 'processed' : 'failed'}`);
     } catch (error) {
       this.logger.error(
         `Failed to mark event as processed: ${error instanceof Error ? error.message : 'Unknown error'}`,

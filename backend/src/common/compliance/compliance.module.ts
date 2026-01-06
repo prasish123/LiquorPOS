@@ -5,13 +5,7 @@ import { PrismaService } from '../../prisma.service';
 import { EncryptionService } from '../encryption.service';
 
 @Module({
-  providers: [
-    EnhancedComplianceAgent,
-    IDScannerService,
-    PrismaService,
-    EncryptionService,
-  ],
+  providers: [EnhancedComplianceAgent, IDScannerService, PrismaService, EncryptionService],
   exports: [EnhancedComplianceAgent, IDScannerService],
 })
 export class ComplianceModule {}
-

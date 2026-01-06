@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SalesSummaryDto {
-  @ApiProperty({ description: 'Total revenue', example: 15420.50 })
+  @ApiProperty({ description: 'Total revenue', example: 15420.5 })
   totalRevenue: number;
 
   @ApiProperty({ description: 'Total transactions', example: 145 })
@@ -16,10 +16,13 @@ export class SalesSummaryDto {
   @ApiProperty({ description: 'Total tax collected', example: 1234.56 })
   totalTax: number;
 
-  @ApiProperty({ description: 'Total discounts given', example: 234.50 })
+  @ApiProperty({ description: 'Total discounts given', example: 234.5 })
   totalDiscounts: number;
 
-  @ApiProperty({ description: 'Net revenue (after discounts)', example: 15186.00 })
+  @ApiProperty({
+    description: 'Net revenue (after discounts)',
+    example: 15186.0,
+  })
   netRevenue: number;
 }
 
@@ -44,7 +47,10 @@ export class ProductPerformanceDto {
   @ApiProperty({ description: 'Product ID', example: 'prod_123' })
   productId: string;
 
-  @ApiProperty({ description: 'Product name', example: 'Cabernet Sauvignon 2020' })
+  @ApiProperty({
+    description: 'Product name',
+    example: 'Cabernet Sauvignon 2020',
+  })
   productName: string;
 
   @ApiProperty({ description: 'SKU', example: 'WIN-CAB-2020' })
@@ -56,10 +62,10 @@ export class ProductPerformanceDto {
   @ApiProperty({ description: 'Units sold', example: 45 })
   unitsSold: number;
 
-  @ApiProperty({ description: 'Total revenue', example: 2250.00 })
+  @ApiProperty({ description: 'Total revenue', example: 2250.0 })
   totalRevenue: number;
 
-  @ApiProperty({ description: 'Average selling price', example: 50.00 })
+  @ApiProperty({ description: 'Average selling price', example: 50.0 })
   averagePrice: number;
 
   @ApiProperty({ description: 'Profit margin percentage', example: 35.5 })
@@ -73,7 +79,7 @@ export class ProductPerformanceDto {
 }
 
 export class InventoryReportDto {
-  @ApiProperty({ description: 'Total inventory value', example: 125000.00 })
+  @ApiProperty({ description: 'Total inventory value', example: 125000.0 })
   totalValue: number;
 
   @ApiProperty({ description: 'Total items in stock', example: 2500 })
@@ -125,7 +131,7 @@ export class EmployeePerformanceDto {
   @ApiProperty({ description: 'Total transactions processed', example: 145 })
   transactionsProcessed: number;
 
-  @ApiProperty({ description: 'Total revenue generated', example: 15420.50 })
+  @ApiProperty({ description: 'Total revenue generated', example: 15420.5 })
   totalRevenue: number;
 
   @ApiProperty({ description: 'Average transaction value', example: 106.35 })
@@ -163,4 +169,3 @@ export class ReportMetadataDto {
   @ApiProperty({ description: 'Data points count' })
   dataPoints: number;
 }
-

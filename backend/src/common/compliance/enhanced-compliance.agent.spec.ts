@@ -89,9 +89,7 @@ describe('EnhancedComplianceAgent', () => {
     it('should throw error when location not found', async () => {
       mockPrismaService.location.findUnique.mockResolvedValue(null);
 
-      await expect(
-        agent.verifyCompliance(items, locationId),
-      ).rejects.toThrow(BadRequestException);
+      await expect(agent.verifyCompliance(items, locationId)).rejects.toThrow(BadRequestException);
     });
 
     it('should enforce state-specific minimum age', async () => {
@@ -115,12 +113,12 @@ describe('EnhancedComplianceAgent', () => {
         dateOfBirth,
       });
 
-      await expect(
-        agent.verifyCompliance(items, locationId, 'cust-001', true),
-      ).rejects.toThrow(ForbiddenException);
-      await expect(
-        agent.verifyCompliance(items, locationId, 'cust-001', true),
-      ).rejects.toThrow('must be at least 21 years old');
+      await expect(agent.verifyCompliance(items, locationId, 'cust-001', true)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(agent.verifyCompliance(items, locationId, 'cust-001', true)).rejects.toThrow(
+        'must be at least 21 years old',
+      );
     });
 
     it('should validate ID type for state', async () => {
@@ -179,7 +177,7 @@ describe('EnhancedComplianceAgent', () => {
         idVerification,
       );
 
-      expect(result.warnings.some(w => w.includes('requires ID scanning'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('requires ID scanning'))).toBe(true);
     });
 
     it('should check time-based restrictions', async () => {
@@ -198,12 +196,7 @@ describe('EnhancedComplianceAgent', () => {
       });
 
       // Test would check Sunday restrictions for spirits in TX
-      const result = await agent.verifyCompliance(
-        items,
-        locationId,
-        undefined,
-        true,
-      );
+      const result = await agent.verifyCompliance(items, locationId, undefined, true);
 
       expect(result.stateCode).toBe('TX');
       expect(result.regulation).toBeDefined();
@@ -321,11 +314,7 @@ describe('EnhancedComplianceAgent', () => {
         { category: 'beer', ageRestricted: true },
       ]);
 
-      const report = await agent.generateComplianceReport(
-        'loc-001',
-        startDate,
-        endDate,
-      );
+      const report = await agent.generateComplianceReport('loc-001', startDate, endDate);
 
       expect(report.summary.totalTransactions).toBe(2);
       expect(report.summary.ageVerifiedTransactions).toBe(1);
@@ -365,7 +354,7 @@ describe('EnhancedComplianceAgent', () => {
       const result = await agent.validateStateLicense('loc-001');
 
       expect(result.valid).toBe(true);
-      expect(result.warnings.some(w => w.includes('expires in'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('expires in'))).toBe(true);
     });
 
     it('should fail when license is expired', async () => {
@@ -398,4 +387,3 @@ describe('EnhancedComplianceAgent', () => {
     });
   });
 });
-

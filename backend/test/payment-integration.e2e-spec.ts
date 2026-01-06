@@ -26,8 +26,7 @@ describe('Payment Integration (e2e)', () => {
   beforeAll(async () => {
     // Ensure test environment
     process.env.NODE_ENV = 'test';
-    process.env.STRIPE_SECRET_KEY =
-      process.env.STRIPE_SECRET_KEY || 'sk_test_mock';
+    process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_mock';
     process.env.AUDIT_LOG_ENCRYPTION_KEY = 'cF1Ds+TIJ+LtW37PvZeHZ8Viav/e5UimfKvZsU2HAzA='; // Base64-encoded 32 bytes
     process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
 
@@ -63,12 +62,10 @@ describe('Payment Integration (e2e)', () => {
     });
 
     // Login to get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        username: 'test-cashier-payment',
-        password: 'test-password',
-      });
+    const loginResponse = await request(app.getHttpServer()).post('/auth/login').send({
+      username: 'test-cashier-payment',
+      password: 'test-password',
+    });
 
     authToken = loginResponse.body.access_token;
 
@@ -166,10 +163,7 @@ describe('Payment Integration (e2e)', () => {
   describe('Card Payment Flow', () => {
     it('should authorize and capture card payment', async () => {
       // Skip if no real Stripe key configured
-      if (
-        !process.env.STRIPE_SECRET_KEY ||
-        process.env.STRIPE_SECRET_KEY === 'sk_test_mock'
-      ) {
+      if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_mock') {
         console.log('Skipping card payment test - no Stripe key configured');
         return;
       }
@@ -236,10 +230,7 @@ describe('Payment Integration (e2e)', () => {
       });
 
       // This will fail if Stripe is not configured
-      if (
-        !process.env.STRIPE_SECRET_KEY ||
-        process.env.STRIPE_SECRET_KEY === 'sk_test_mock'
-      ) {
+      if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_mock') {
         await request(app.getHttpServer())
           .post('/orders')
           .set('Authorization', `Bearer ${authToken}`)

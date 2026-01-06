@@ -95,25 +95,19 @@ describe('StripeWebhookService', () => {
   describe('processWebhook', () => {
     it('should throw error if Stripe is not initialized', async () => {
       delete process.env.STRIPE_SECRET_KEY;
-      const uninitializedService = new StripeWebhookService(
-        prismaService,
-        webhooksService,
-      );
+      const uninitializedService = new StripeWebhookService(prismaService, webhooksService);
 
       const rawBody = Buffer.from('{}');
       const signature = 'test_signature';
 
-      await expect(
-        uninitializedService.processWebhook(rawBody, signature),
-      ).rejects.toThrow('Stripe not initialized');
+      await expect(uninitializedService.processWebhook(rawBody, signature)).rejects.toThrow(
+        'Stripe not initialized',
+      );
     });
 
     it('should process webhook without signature verification if secret not configured', async () => {
       delete process.env.STRIPE_WEBHOOK_SECRET;
-      const serviceWithoutSecret = new StripeWebhookService(
-        prismaService,
-        webhooksService,
-      );
+      const serviceWithoutSecret = new StripeWebhookService(prismaService, webhooksService);
 
       const mockEvent = {
         id: 'evt_test_123',
@@ -146,10 +140,7 @@ describe('StripeWebhookService', () => {
         'evt_test_123',
         mockEvent,
       );
-      expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event_123',
-        true,
-      );
+      expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith('event_123', true);
     });
   });
 
@@ -205,10 +196,7 @@ describe('StripeWebhookService', () => {
       await service.processWebhook(rawBody, 'test_signature');
 
       expect(mockPrismaService.payment.update).not.toHaveBeenCalled();
-      expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event_123',
-        true,
-      );
+      expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith('event_123', true);
     });
   });
 
@@ -405,15 +393,13 @@ describe('StripeWebhookService', () => {
       };
 
       mockWebhooksService.storeWebhookEvent.mockResolvedValue('event_123');
-      mockPrismaService.payment.findFirst.mockRejectedValue(
-        new Error('Database error'),
-      );
+      mockPrismaService.payment.findFirst.mockRejectedValue(new Error('Database error'));
 
       const rawBody = Buffer.from(JSON.stringify(mockEvent));
 
-      await expect(
-        service.processWebhook(rawBody, 'test_signature'),
-      ).rejects.toThrow('Database error');
+      await expect(service.processWebhook(rawBody, 'test_signature')).rejects.toThrow(
+        'Database error',
+      );
 
       expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith(
         'event_123',
@@ -438,10 +424,7 @@ describe('StripeWebhookService', () => {
       const rawBody = Buffer.from(JSON.stringify(mockEvent));
       await service.processWebhook(rawBody, 'test_signature');
 
-      expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith(
-        'event_123',
-        true,
-      );
+      expect(mockWebhooksService.markEventProcessed).toHaveBeenCalledWith('event_123', true);
     });
   });
 });

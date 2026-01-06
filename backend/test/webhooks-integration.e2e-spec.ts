@@ -13,10 +13,8 @@ describe('Webhooks Integration (e2e)', () => {
 
   beforeAll(async () => {
     // Set test environment variables
-    process.env.STRIPE_SECRET_KEY =
-      process.env.STRIPE_SECRET_KEY || 'sk_test_123456789';
-    process.env.STRIPE_WEBHOOK_SECRET =
-      process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_secret';
+    process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_123456789';
+    process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_secret';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -67,9 +65,7 @@ describe('Webhooks Integration (e2e)', () => {
         .send({ type: 'payment_intent.succeeded' })
         .expect(400);
 
-      expect(response.body.message).toContain(
-        'Missing stripe-signature header',
-      );
+      expect(response.body.message).toContain('Missing stripe-signature header');
     });
 
     it('should accept webhook with valid structure (without signature verification)', async () => {

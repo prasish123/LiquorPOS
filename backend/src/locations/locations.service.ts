@@ -84,9 +84,7 @@ export class LocationsService {
       where: { id },
       data: {
         ...dto,
-        licenseExpiry: dto.licenseExpiry
-          ? new Date(dto.licenseExpiry)
-          : undefined,
+        licenseExpiry: dto.licenseExpiry ? new Date(dto.licenseExpiry) : undefined,
       },
     });
 

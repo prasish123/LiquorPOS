@@ -233,4 +233,3 @@ export class DoorDashWebhookDto {
   @IsOptional()
   metadata?: any;
 }
-

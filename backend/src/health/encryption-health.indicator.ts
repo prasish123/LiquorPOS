@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  HealthIndicator,
-  HealthIndicatorResult,
-  HealthCheckError,
-} from '@nestjs/terminus';
+import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
 import { EncryptionService } from '../common/encryption.service';
 
 /**
@@ -42,8 +38,7 @@ export class EncryptionHealthIndicator extends HealthIndicator {
 
       return result;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const result = this.getStatus(key, false, {
         status: 'down',
         message: `Encryption check failed: ${errorMessage}`,

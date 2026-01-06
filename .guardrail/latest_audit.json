@@ -1,0 +1,122 @@
+{
+  "timestamp": "2026-01-05T02:08:11.079198",
+  "overall_score": 82.75,
+  "overall_level": "green",
+  "dimensions": {
+    "code_quality": {
+      "score": 65.0,
+      "level": "yellow",
+      "issues": [
+        "Backend ESLint configuration missing",
+        "Frontend ESLint configuration missing",
+        "Prettier configuration missing"
+      ],
+      "recommendations": [
+        "Add .eslintrc.js to backend/",
+        "Add .eslintrc.js to frontend/",
+        "Add .prettierrc for consistent formatting"
+      ],
+      "details": {
+        "backend": {
+          "errors": 0,
+          "warnings": 0,
+          "status": "error"
+        },
+        "frontend": {
+          "errors": 0,
+          "warnings": 0,
+          "status": "error"
+        }
+      }
+    },
+    "testing": {
+      "score": 80.0,
+      "level": "green",
+      "issues": [
+        "Jest configuration missing",
+        "Backend test coverage low: 0%"
+      ],
+      "recommendations": [
+        "Increase test coverage to at least 80%"
+      ],
+      "details": {
+        "backend_tests": 44,
+        "frontend_tests": 1,
+        "test_results": {
+          "backend": {
+            "status": "error",
+            "coverage": 0,
+            "failures": 0
+          },
+          "frontend": {
+            "status": "not_run",
+            "coverage": 0,
+            "failures": 0
+          }
+        }
+      }
+    },
+    "deployment": {
+      "score": 90.0,
+      "level": "green",
+      "issues": [
+        ".env.example missing"
+      ],
+      "recommendations": [
+        "Create .env.example with all required environment variables"
+      ],
+      "details": {
+        "docker_compose": true,
+        "dockerfiles": {
+          "backend": true,
+          "frontend": true
+        },
+        "env_example": false,
+        "deploy_script": true,
+        "ci_cd": true
+      }
+    },
+    "documentation": {
+      "score": 90.0,
+      "level": "green",
+      "issues": [
+        "API documentation missing"
+      ],
+      "recommendations": [
+        "Document API endpoints and schemas"
+      ],
+      "details": {
+        "required_docs": {
+          "README.md": true,
+          "DEPLOYMENT.md": true,
+          "RUNBOOK.md": true,
+          "docs/architecture.md": true,
+          "docs/PRD.md": true
+        },
+        "api_docs": 0
+      }
+    },
+    "prd_compliance": {
+      "score": 100.0,
+      "level": "green",
+      "issues": [],
+      "recommendations": [],
+      "details": {
+        "status": "mapped",
+        "total_requirements": 0,
+        "implemented": 0,
+        "mapping": {}
+      }
+    }
+  },
+  "critical_issues": [],
+  "warnings": [
+    "[code_quality] Backend ESLint configuration missing",
+    "[code_quality] Frontend ESLint configuration missing",
+    "[code_quality] Prettier configuration missing"
+  ],
+  "metadata": {
+    "full_audit": true,
+    "repo_path": "E:\\ML Projects\\POS-Omni\\liquor-pos"
+  }
+}

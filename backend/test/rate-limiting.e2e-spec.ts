@@ -66,13 +66,9 @@ describe('Rate Limiting (e2e)', () => {
     await app.init();
 
     // Get CSRF token
-    const tokenResponse = await request(app.getHttpServer()).get(
-      '/auth/csrf-token',
-    );
+    const tokenResponse = await request(app.getHttpServer()).get('/auth/csrf-token');
     const cookies = tokenResponse.headers['set-cookie'];
-    const csrfCookieHeader = cookies.find((c: string) =>
-      c.startsWith('csrf-token='),
-    );
+    const csrfCookieHeader = cookies.find((c: string) => c.startsWith('csrf-token='));
     csrfToken = csrfCookieHeader.split(';')[0].split('=')[1];
 
     // Login to get auth token
@@ -87,9 +83,7 @@ describe('Rate Limiting (e2e)', () => {
 
     if (loginResponse.status === 200) {
       const authCookies = loginResponse.headers['set-cookie'];
-      const authCookieHeader = authCookies.find((c: string) =>
-        c.startsWith('access_token='),
-      );
+      const authCookieHeader = authCookies.find((c: string) => c.startsWith('access_token='));
       if (authCookieHeader) {
         authToken = authCookieHeader.split(';')[0].split('=')[1];
       }
@@ -109,10 +103,7 @@ describe('Rate Limiting (e2e)', () => {
         requests.push(
           request(app.getHttpServer())
             .get('/')
-            .set(
-              'Cookie',
-              `access_token=${authToken}; csrf-token=${csrfToken}`,
-            ),
+            .set('Cookie', `access_token=${authToken}; csrf-token=${csrfToken}`),
         );
       }
 
@@ -131,10 +122,7 @@ describe('Rate Limiting (e2e)', () => {
         requests.push(
           request(app.getHttpServer())
             .get('/')
-            .set(
-              'Cookie',
-              `access_token=${authToken}; csrf-token=${csrfToken}`,
-            ),
+            .set('Cookie', `access_token=${authToken}; csrf-token=${csrfToken}`),
         );
       }
 
@@ -348,8 +336,7 @@ describe('Rate Limiting (e2e)', () => {
 
       // Check for X-RateLimit headers
       expect(
-        response.headers['x-ratelimit-limit'] ||
-          response.headers['ratelimit-limit'],
+        response.headers['x-ratelimit-limit'] || response.headers['ratelimit-limit'],
       ).toBeDefined();
     });
   });

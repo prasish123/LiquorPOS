@@ -24,17 +24,13 @@ describe('EncryptionService', () => {
     it('should throw error if key is not base64', () => {
       process.env.AUDIT_LOG_ENCRYPTION_KEY = 'not-base64!!!';
       const service = new EncryptionService();
-      expect(() => service.onModuleInit()).toThrow(
-        'Invalid AUDIT_LOG_ENCRYPTION_KEY format',
-      );
+      expect(() => service.onModuleInit()).toThrow('Invalid AUDIT_LOG_ENCRYPTION_KEY format');
     });
 
     it('should throw error if key is wrong length', () => {
       process.env.AUDIT_LOG_ENCRYPTION_KEY = randomBytes(16).toString('base64'); // 16 bytes instead of 32
       const service = new EncryptionService();
-      expect(() => service.onModuleInit()).toThrow(
-        'Encryption key must be 32 bytes',
-      );
+      expect(() => service.onModuleInit()).toThrow('Encryption key must be 32 bytes');
     });
 
     it('should initialize successfully with valid key', () => {
@@ -99,9 +95,7 @@ describe('EncryptionService', () => {
     });
 
     it('should throw error for invalid ciphertext format', () => {
-      expect(() => service.decrypt('invalid')).toThrow(
-        'Invalid ciphertext format',
-      );
+      expect(() => service.decrypt('invalid')).toThrow('Invalid ciphertext format');
     });
 
     it('should throw error for corrupted ciphertext', () => {
@@ -221,22 +215,13 @@ describe('EncryptionService', () => {
     });
 
     it('should re-encrypt multiple entries', () => {
-      const entries = [
-        'entry 1',
-        'entry 2',
-        'entry 3',
-        JSON.stringify({ id: 1, data: 'test' }),
-      ];
+      const entries = ['entry 1', 'entry 2', 'entry 3', JSON.stringify({ id: 1, data: 'test' })];
 
       // Encrypt all with old key
-      const encryptedEntries = entries.map(
-        (e) => serviceWithOldKey.encrypt(e)!,
-      );
+      const encryptedEntries = entries.map((e) => serviceWithOldKey.encrypt(e)!);
 
       // Re-encrypt all with rotation service
-      const reEncryptedEntries = encryptedEntries.map((e) =>
-        serviceWithBothKeys.reEncrypt(e),
-      );
+      const reEncryptedEntries = encryptedEntries.map((e) => serviceWithBothKeys.reEncrypt(e));
 
       // Verify all can be decrypted with new key only
       reEncryptedEntries.forEach((encrypted, index) => {
@@ -274,18 +259,12 @@ describe('EncryptionService', () => {
       const wrongKeyService = new EncryptionService();
       wrongKeyService.onModuleInit();
 
-      expect(() => wrongKeyService.decrypt(encrypted)).toThrow(
-        'Decryption failed',
-      );
+      expect(() => wrongKeyService.decrypt(encrypted)).toThrow('Decryption failed');
     });
 
     it('should throw error for malformed ciphertext (missing parts)', () => {
-      expect(() => service.decrypt('onlyonepart')).toThrow(
-        'Invalid ciphertext format',
-      );
-      expect(() => service.decrypt('two:parts')).toThrow(
-        'Invalid ciphertext format',
-      );
+      expect(() => service.decrypt('onlyonepart')).toThrow('Invalid ciphertext format');
+      expect(() => service.decrypt('two:parts')).toThrow('Invalid ciphertext format');
     });
 
     it('should throw error for invalid base64 in ciphertext', () => {

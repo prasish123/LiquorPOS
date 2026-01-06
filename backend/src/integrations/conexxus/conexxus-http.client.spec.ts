@@ -63,9 +63,7 @@ describe('ConexxusHttpClient', () => {
         timestamp: new Date().toISOString(),
       });
 
-      await expect(client.fetchInventoryItems()).rejects.toThrow(
-        'Failed to fetch inventory items',
-      );
+      await expect(client.fetchInventoryItems()).rejects.toThrow('Failed to fetch inventory items');
     });
 
     it('should handle network errors', async () => {
@@ -120,9 +118,7 @@ describe('ConexxusHttpClient', () => {
         timestamp: new Date().toISOString(),
       });
 
-      await expect(client.pushSalesData(salesData)).rejects.toThrow(
-        'Failed to push sales data',
-      );
+      await expect(client.pushSalesData(salesData)).rejects.toThrow('Failed to push sales data');
     });
   });
 
@@ -190,41 +186,31 @@ describe('ConexxusHttpClient', () => {
     it('should handle 401 authentication errors', async () => {
       mockAxios.onGet('/api/v1/inventory/items').reply(401);
 
-      await expect(client.fetchInventoryItems()).rejects.toThrow(
-        'authentication failed',
-      );
+      await expect(client.fetchInventoryItems()).rejects.toThrow('authentication failed');
     });
 
     it('should handle 403 forbidden errors', async () => {
       mockAxios.onGet('/api/v1/inventory/items').reply(403);
 
-      await expect(client.fetchInventoryItems()).rejects.toThrow(
-        'access forbidden',
-      );
+      await expect(client.fetchInventoryItems()).rejects.toThrow('access forbidden');
     });
 
     it('should handle 404 not found errors', async () => {
       mockAxios.onGet('/api/v1/inventory/items').reply(404);
 
-      await expect(client.fetchInventoryItems()).rejects.toThrow(
-        'endpoint not found',
-      );
+      await expect(client.fetchInventoryItems()).rejects.toThrow('endpoint not found');
     });
 
     it('should handle 429 rate limit errors', async () => {
       mockAxios.onGet('/api/v1/inventory/items').reply(429);
 
-      await expect(client.fetchInventoryItems()).rejects.toThrow(
-        'rate limit exceeded',
-      );
+      await expect(client.fetchInventoryItems()).rejects.toThrow('rate limit exceeded');
     });
 
     it('should handle 500 server errors', async () => {
       mockAxios.onGet('/api/v1/inventory/items').reply(500);
 
-      await expect(client.fetchInventoryItems()).rejects.toThrow(
-        'server error',
-      );
+      await expect(client.fetchInventoryItems()).rejects.toThrow('server error');
     });
   });
 

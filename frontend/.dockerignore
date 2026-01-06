@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+npm-debug.log
+package-lock.json
+
+# Build output
+dist
+build
+
+# Testing
+coverage
+test-results
+e2e
+playwright-report
+test-results
+
+# Environment files (CRITICAL - never copy to image)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Config files
+.eslintrc*
+.prettierrc*
+tsconfig*.json
+vite.config.ts
+playwright.config.ts
+

@@ -67,9 +67,7 @@ export class PaymentsController {
   })
   @ApiResponse({ status: 400, description: 'Invalid terminal configuration' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async registerTerminal(
-    @Body() dto: RegisterTerminalDto,
-  ): Promise<TerminalResponseDto> {
+  async registerTerminal(@Body() dto: RegisterTerminalDto): Promise<TerminalResponseDto> {
     this.logger.log(`Registering terminal: ${dto.id}`);
 
     await this.terminalManager.registerTerminal({
@@ -187,7 +185,10 @@ export class PaymentsController {
     description: 'Remove a terminal from the system',
   })
   @ApiParam({ name: 'id', description: 'Terminal ID' })
-  @ApiResponse({ status: 204, description: 'Terminal unregistered successfully' })
+  @ApiResponse({
+    status: 204,
+    description: 'Terminal unregistered successfully',
+  })
   @ApiResponse({ status: 404, description: 'Terminal not found' })
   async unregisterTerminal(@Param('id') id: string): Promise<void> {
     this.logger.log(`Unregistering terminal: ${id}`);
@@ -206,9 +207,7 @@ export class PaymentsController {
     type: TerminalHealthResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Terminal not found' })
-  async getTerminalHealth(
-    @Param('id') id: string,
-  ): Promise<TerminalHealthResponseDto> {
+  async getTerminalHealth(@Param('id') id: string): Promise<TerminalHealthResponseDto> {
     const health = await this.terminalManager.checkTerminalHealth(id);
     return health;
   }
@@ -285,12 +284,8 @@ export class PaymentsController {
     type: PaxTransactionResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid void request' })
-  async voidPaxTransaction(
-    @Body() dto: VoidTransactionDto,
-  ): Promise<PaxTransactionResponseDto> {
-    this.logger.log(
-      `Voiding transaction ${dto.referenceNumber} on terminal ${dto.terminalId}`,
-    );
+  async voidPaxTransaction(@Body() dto: VoidTransactionDto): Promise<PaxTransactionResponseDto> {
+    this.logger.log(`Voiding transaction ${dto.referenceNumber} on terminal ${dto.terminalId}`);
 
     const result = await this.paxAgent.processTransaction(dto.terminalId, {
       amount: dto.amount,
@@ -373,7 +368,11 @@ export class PaymentsController {
     description: 'Get list of available payment processors for a given request',
   })
   @ApiQuery({ name: 'locationId', required: true, description: 'Location ID' })
-  @ApiQuery({ name: 'amount', required: true, description: 'Transaction amount' })
+  @ApiQuery({
+    name: 'amount',
+    required: true,
+    description: 'Transaction amount',
+  })
   @ApiQuery({
     name: 'method',
     required: true,
@@ -420,4 +419,3 @@ export class PaymentsController {
     };
   }
 }
-

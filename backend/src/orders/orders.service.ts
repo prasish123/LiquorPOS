@@ -1,11 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { OrderOrchestrator } from './order-orchestrator';
-import {
-  CreateOrderDto,
-  UpdateOrderDto,
-  OrderResponseDto,
-} from './dto/order.dto';
+import { CreateOrderDto, UpdateOrderDto, OrderResponseDto } from './dto/order.dto';
 
 @Injectable()
 export class OrdersService {
@@ -98,13 +94,12 @@ export class OrdersService {
    * Get orders by date range
    */
   async findByDateRange(startDate: Date, endDate: Date, locationId?: string) {
-    const where: { createdAt: { gte: Date; lte: Date }; locationId?: string } =
-      {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      };
+    const where: { createdAt: { gte: Date; lte: Date }; locationId?: string } = {
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+    };
 
     if (locationId) {
       where.locationId = locationId;

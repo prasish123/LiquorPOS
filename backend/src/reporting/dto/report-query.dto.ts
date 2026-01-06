@@ -90,4 +90,3 @@ export class EmployeeReportQueryDto extends ReportQueryDto {
   @IsString()
   employeeId?: string;
 }
-

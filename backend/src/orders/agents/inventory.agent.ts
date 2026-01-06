@@ -19,10 +19,7 @@ export class InventoryAgent {
    * Check inventory availability and reserve items
    * Uses database transaction with row-level locking to prevent race conditions
    */
-  async checkAndReserve(
-    locationId: string,
-    items: OrderItemDto[],
-  ): Promise<InventoryReservation> {
+  async checkAndReserve(locationId: string, items: OrderItemDto[]): Promise<InventoryReservation> {
     const reservationId = crypto.randomUUID();
     const reservedItems: InventoryReservation['items'] = [];
 
@@ -41,9 +38,7 @@ export class InventoryAgent {
           });
 
           if (!product) {
-            throw new BadRequestException(
-              `Product with SKU ${item.sku} not found`,
-            );
+            throw new BadRequestException(`Product with SKU ${item.sku} not found`);
           }
 
           // Check if we track inventory for this product
@@ -75,9 +70,7 @@ export class InventoryAgent {
           `;
 
           if (!lockedInventory || lockedInventory.length === 0) {
-            throw new BadRequestException(
-              `Failed to lock inventory for product ${item.sku}`,
-            );
+            throw new BadRequestException(`Failed to lock inventory for product ${item.sku}`);
           }
 
           const locked = lockedInventory[0];
@@ -122,10 +115,7 @@ export class InventoryAgent {
    * Release reserved inventory (compensation)
    * Uses transaction with row locking to ensure atomic release
    */
-  async release(
-    reservation: InventoryReservation,
-    locationId: string,
-  ): Promise<void> {
+  async release(reservation: InventoryReservation, locationId: string): Promise<void> {
     await this.prisma.$transaction(
       async (tx) => {
         for (const item of reservation.items) {
@@ -140,9 +130,7 @@ export class InventoryAgent {
 
           if (product && product.trackInventory && product.inventory[0]) {
             // Lock the inventory row before updating
-            const lockedInventory = await tx.$queryRaw<
-              Array<{ id: string; reserved: number }>
-            >`
+            const lockedInventory = await tx.$queryRaw<Array<{ id: string; reserved: number }>>`
               SELECT id, reserved 
               FROM "Inventory" 
               WHERE id = ${product.inventory[0].id}
@@ -173,10 +161,7 @@ export class InventoryAgent {
    * Commit reservation (convert reserved to sold)
    * Uses transaction with row locking to ensure atomic commit
    */
-  async commit(
-    reservation: InventoryReservation,
-    locationId: string,
-  ): Promise<void> {
+  async commit(reservation: InventoryReservation, locationId: string): Promise<void> {
     await this.prisma.$transaction(
       async (tx) => {
         for (const item of reservation.items) {

@@ -84,70 +84,37 @@ export function getAppConfig(): AppConfig {
     port: parseInt(process.env.PORT || '3000', 10),
 
     redis: {
-      memoryCacheSize: parseInt(
-        process.env.REDIS_MEMORY_CACHE_SIZE || '100',
-        10,
-      ),
-      cleanupIntervalMs: parseInt(
-        process.env.REDIS_CLEANUP_INTERVAL_MS || '60000',
-        10,
-      ),
-      maxRetryAttempts: parseInt(
-        process.env.REDIS_MAX_RETRY_ATTEMPTS || '3',
-        10,
-      ),
-      retryBackoffMs: parseInt(
-        process.env.REDIS_RETRY_BACKOFF_MS || '2000',
-        10,
-      ),
-      maxRetriesPerRequest: parseInt(
-        process.env.REDIS_MAX_RETRIES_PER_REQUEST || '3',
-        10,
-      ),
+      memoryCacheSize: parseInt(process.env.REDIS_MEMORY_CACHE_SIZE || '100', 10),
+      cleanupIntervalMs: parseInt(process.env.REDIS_CLEANUP_INTERVAL_MS || '60000', 10),
+      maxRetryAttempts: parseInt(process.env.REDIS_MAX_RETRY_ATTEMPTS || '3', 10),
+      retryBackoffMs: parseInt(process.env.REDIS_RETRY_BACKOFF_MS || '2000', 10),
+      maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES_PER_REQUEST || '3', 10),
     },
 
     conexxus: {
-      uploadTimeoutMs: parseInt(
-        process.env.CONEXXUS_UPLOAD_TIMEOUT || '60000',
-        10,
-      ),
-      healthCheckTimeoutMs: parseInt(
-        process.env.CONEXXUS_HEALTH_CHECK_TIMEOUT || '5000',
-        10,
-      ),
-      maxMetricsHistory: parseInt(
-        process.env.CONEXXUS_MAX_METRICS_HISTORY || '100',
-        10,
-      ),
+      uploadTimeoutMs: parseInt(process.env.CONEXXUS_UPLOAD_TIMEOUT || '60000', 10),
+      healthCheckTimeoutMs: parseInt(process.env.CONEXXUS_HEALTH_CHECK_TIMEOUT || '5000', 10),
+      maxMetricsHistory: parseInt(process.env.CONEXXUS_MAX_METRICS_HISTORY || '100', 10),
       syncSchedule: process.env.CONEXXUS_SYNC_SCHEDULE || '0 * * * *',
-      salesPushSchedule:
-        process.env.CONEXXUS_SALES_PUSH_SCHEDULE || '0 30 23 * * *',
+      salesPushSchedule: process.env.CONEXXUS_SALES_PUSH_SCHEDULE || '0 30 23 * * *',
     },
 
     system: {
-      diskPath:
-        process.env.DISK_PATH ||
-        (process.platform === 'win32' ? 'C:\\' : '/'),
-      diskUsageThreshold: parseFloat(
-        process.env.DISK_USAGE_THRESHOLD || '0.9',
-      ),
+      diskPath: process.env.DISK_PATH || (process.platform === 'win32' ? 'C:\\' : '/'),
+      diskUsageThreshold: parseFloat(process.env.DISK_USAGE_THRESHOLD || '0.9'),
       idScanDelayMs: parseInt(process.env.ID_SCAN_DELAY_MS || '500', 10),
     },
 
     backup: {
       maxAgeHours: parseInt(process.env.BACKUP_MAX_AGE_HOURS || '25', 10),
-      statsWindowHours: parseInt(
-        process.env.BACKUP_STATS_WINDOW_HOURS || '24',
-        10,
-      ),
+      statsWindowHours: parseInt(process.env.BACKUP_STATS_WINDOW_HOURS || '24', 10),
       schedule: process.env.BACKUP_SCHEDULE || '0 2 * * *',
       cleanupSchedule: process.env.BACKUP_CLEANUP_SCHEDULE || '0 * * * *',
     },
 
     offlineQueue: {
       cleanupDays: parseInt(process.env.OFFLINE_QUEUE_CLEANUP_DAYS || '7', 10),
-      processSchedule:
-        process.env.OFFLINE_QUEUE_PROCESS_SCHEDULE || '*/5 * * * *',
+      processSchedule: process.env.OFFLINE_QUEUE_PROCESS_SCHEDULE || '*/5 * * * *',
     },
 
     network: {
@@ -155,23 +122,15 @@ export function getAppConfig(): AppConfig {
     },
 
     businessRules: {
-      defaultProductMargin: parseFloat(
-        process.env.DEFAULT_PRODUCT_MARGIN || '0.3',
-      ),
+      defaultProductMargin: parseFloat(process.env.DEFAULT_PRODUCT_MARGIN || '0.3'),
       maxOrderQuantity: parseInt(process.env.MAX_ORDER_QUANTITY || '1000', 10),
-      maxTransactionAmount: parseInt(
-        process.env.MAX_TRANSACTION_AMOUNT || '100000',
-        10,
-      ),
+      maxTransactionAmount: parseInt(process.env.MAX_TRANSACTION_AMOUNT || '100000', 10),
     },
 
     observability: {
       lokiUrl: process.env.LOKI_URL,
       lokiEnabled: process.env.LOKI_ENABLED === 'true',
-      lokiBatchInterval: parseInt(
-        process.env.LOKI_BATCH_INTERVAL || '5000',
-        10,
-      ),
+      lokiBatchInterval: parseInt(process.env.LOKI_BATCH_INTERVAL || '5000', 10),
       lokiMaxBatchSize: parseInt(process.env.LOKI_MAX_BATCH_SIZE || '100', 10),
       lokiMaxRetries: parseInt(process.env.LOKI_MAX_RETRIES || '3', 10),
     },
@@ -199,10 +158,7 @@ export function validateAppConfig(config: AppConfig): void {
   }
 
   // Validate system config
-  if (
-    config.system.diskUsageThreshold < 0 ||
-    config.system.diskUsageThreshold > 1
-  ) {
+  if (config.system.diskUsageThreshold < 0 || config.system.diskUsageThreshold > 1) {
     errors.push('DISK_USAGE_THRESHOLD must be between 0 and 1');
   }
 
@@ -274,4 +230,3 @@ export function getValidatedConfig(): AppConfig {
   validateAppConfig(config);
   return config;
 }
-

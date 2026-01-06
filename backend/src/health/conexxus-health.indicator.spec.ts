@@ -74,25 +74,17 @@ describe('ConexxusHealthIndicator', () => {
     it('should throw HealthCheckError when Conexxus API is not responding', async () => {
       jest.spyOn(conexxusClient, 'healthCheck').mockResolvedValue(false);
 
-      await expect(indicator.isHealthy('conexxus')).rejects.toThrow(
-        HealthCheckError,
-      );
+      await expect(indicator.isHealthy('conexxus')).rejects.toThrow(HealthCheckError);
     });
 
     it('should throw HealthCheckError when health check fails', async () => {
-      jest
-        .spyOn(conexxusClient, 'healthCheck')
-        .mockRejectedValue(new Error('Connection failed'));
+      jest.spyOn(conexxusClient, 'healthCheck').mockRejectedValue(new Error('Connection failed'));
 
-      await expect(indicator.isHealthy('conexxus')).rejects.toThrow(
-        HealthCheckError,
-      );
+      await expect(indicator.isHealthy('conexxus')).rejects.toThrow(HealthCheckError);
     });
 
     it('should include error message in result when check fails', async () => {
-      jest
-        .spyOn(conexxusClient, 'healthCheck')
-        .mockRejectedValue(new Error('Timeout'));
+      jest.spyOn(conexxusClient, 'healthCheck').mockRejectedValue(new Error('Timeout'));
 
       try {
         await indicator.isHealthy('conexxus');

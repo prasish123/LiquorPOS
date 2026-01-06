@@ -355,3 +355,5 @@ Your entire POS system is safely stored in GitHub, including:
 **Repository:** https://github.com/prasish123/LiquorPOS.git  
 **Status:** ✅ **FULLY SYNCED**
 
+
+

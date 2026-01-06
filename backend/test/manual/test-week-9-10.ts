@@ -21,9 +21,7 @@ async function bootstrap() {
     // Debug: List all products to see what was inserted
     const allProducts = await prisma.product.findMany();
     console.log(`\n📦 DB Content: ${allProducts.length} products found.`);
-    allProducts.forEach((p) =>
-      console.log(` - SKU: "${p.sku}" | Name: "${p.name}"`),
-    );
+    allProducts.forEach((p) => console.log(` - SKU: "${p.sku}" | Name: "${p.name}"`));
 
     // Check for specific items from ItemMaintenance.xml
     // SKU: 012000001345 -> MT DEW DT 20
@@ -50,9 +48,7 @@ async function bootstrap() {
   }
 
   // --- TEST 2: AI Vector Search (Local) ---
-  console.log(
-    '\n--- 2. Testing AI Vector Search (Local - Xenova/all-MiniLM-L6-v2) ---',
-  );
+  console.log('\n--- 2. Testing AI Vector Search (Local - Xenova/all-MiniLM-L6-v2) ---');
   try {
     // Should generate embeddings locally without API key
     const query = 'Dew'; // Should match MT DEW
@@ -68,9 +64,7 @@ async function bootstrap() {
         similarity?: number;
       };
       console.log('Top result:', firstResult.name);
-      const foundDew = results.some((r) =>
-        (r as { name: string }).name.includes('DEW'),
-      );
+      const foundDew = results.some((r) => (r as { name: string }).name.includes('DEW'));
       if (foundDew) {
         console.log('✅ AI Search Verified: Results contain relevant items.');
       } else {

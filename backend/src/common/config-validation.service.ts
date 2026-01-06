@@ -71,12 +71,8 @@ export class ConfigValidationService {
           config.AUDIT_LOG_ENCRYPTION_KEY = encryptionKey;
         }
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        errors.push(
-          `AUDIT_LOG_ENCRYPTION_KEY must be base64-encoded. ` +
-            `Error: ${errorMessage}`,
-        );
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`AUDIT_LOG_ENCRYPTION_KEY must be base64-encoded. ` + `Error: ${errorMessage}`);
       }
     }
 
@@ -106,9 +102,7 @@ export class ConfigValidationService {
         });
 
         if (invalidOrigins.length > 0) {
-          errors.push(
-            `ALLOWED_ORIGINS contains invalid URLs: ${invalidOrigins.join(', ')}`,
-          );
+          errors.push(`ALLOWED_ORIGINS contains invalid URLs: ${invalidOrigins.join(', ')}`);
         } else {
           config.ALLOWED_ORIGINS = allowedOrigins;
         }
@@ -166,10 +160,7 @@ export class ConfigValidationService {
       );
     } else {
       // Validate Stripe key format
-      if (
-        !stripeKey.startsWith('sk_test_') &&
-        !stripeKey.startsWith('sk_live_')
-      ) {
+      if (!stripeKey.startsWith('sk_test_') && !stripeKey.startsWith('sk_live_')) {
         warnings.push(
           'STRIPE_SECRET_KEY has unexpected format. ' +
             'Should start with sk_test_ (test mode) or sk_live_ (live mode)',
@@ -194,10 +185,7 @@ export class ConfigValidationService {
           'Example: postgresql://user:password@localhost:5432/liquor_pos ' +
           'See docs/POSTGRESQL_MIGRATION_GUIDE.md for setup instructions.',
       );
-    } else if (
-      !databaseUrl.startsWith('postgresql://') &&
-      !databaseUrl.startsWith('postgres://')
-    ) {
+    } else if (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://')) {
       errors.push(
         'DATABASE_URL must be a PostgreSQL connection string. ' +
           'SQLite is no longer supported. ' +
@@ -216,9 +204,7 @@ export class ConfigValidationService {
     if (poolMin) {
       const minValue = parseInt(poolMin, 10);
       if (isNaN(minValue) || minValue < 1) {
-        warnings.push(
-          'DATABASE_POOL_MIN must be a positive integer. Using default.',
-        );
+        warnings.push('DATABASE_POOL_MIN must be a positive integer. Using default.');
       } else if (minValue > 50) {
         warnings.push(
           'DATABASE_POOL_MIN is very high (>50). This may consume excessive resources.',
@@ -231,13 +217,9 @@ export class ConfigValidationService {
     if (poolMax) {
       const maxValue = parseInt(poolMax, 10);
       if (isNaN(maxValue) || maxValue < 1) {
-        warnings.push(
-          'DATABASE_POOL_MAX must be a positive integer. Using default.',
-        );
+        warnings.push('DATABASE_POOL_MAX must be a positive integer. Using default.');
       } else if (maxValue > 100) {
-        warnings.push(
-          'DATABASE_POOL_MAX is very high (>100). This may overwhelm PostgreSQL.',
-        );
+        warnings.push('DATABASE_POOL_MAX is very high (>100). This may overwhelm PostgreSQL.');
       } else {
         config.DATABASE_POOL_MAX = maxValue;
       }
@@ -246,18 +228,14 @@ export class ConfigValidationService {
     // Validate min <= max
     if (config.DATABASE_POOL_MIN && config.DATABASE_POOL_MAX) {
       if (config.DATABASE_POOL_MIN > config.DATABASE_POOL_MAX) {
-        errors.push(
-          'DATABASE_POOL_MIN cannot be greater than DATABASE_POOL_MAX.',
-        );
+        errors.push('DATABASE_POOL_MIN cannot be greater than DATABASE_POOL_MAX.');
       }
     }
 
     if (poolIdleTimeout) {
       const timeoutValue = parseInt(poolIdleTimeout, 10);
       if (isNaN(timeoutValue) || timeoutValue < 1000) {
-        warnings.push(
-          'DATABASE_POOL_IDLE_TIMEOUT must be at least 1000ms. Using default.',
-        );
+        warnings.push('DATABASE_POOL_IDLE_TIMEOUT must be at least 1000ms. Using default.');
       } else {
         config.DATABASE_POOL_IDLE_TIMEOUT = timeoutValue;
       }
@@ -266,9 +244,7 @@ export class ConfigValidationService {
     if (poolConnectionTimeout) {
       const timeoutValue = parseInt(poolConnectionTimeout, 10);
       if (isNaN(timeoutValue) || timeoutValue < 1000) {
-        warnings.push(
-          'DATABASE_POOL_CONNECTION_TIMEOUT must be at least 1000ms. Using default.',
-        );
+        warnings.push('DATABASE_POOL_CONNECTION_TIMEOUT must be at least 1000ms. Using default.');
       } else {
         config.DATABASE_POOL_CONNECTION_TIMEOUT = timeoutValue;
       }

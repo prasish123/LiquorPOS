@@ -91,13 +91,10 @@ export class CircuitBreaker {
           ? Math.ceil((this.nextAttemptTime.getTime() - Date.now()) / 1000)
           : 0;
 
-        this.logger.warn(
-          `${this.name}: Circuit is OPEN, failing fast (retry in ${waitTime}s)`,
-          {
-            failureCount: this.failureCount,
-            lastFailure: this.lastFailureTime,
-          },
-        );
+        this.logger.warn(`${this.name}: Circuit is OPEN, failing fast (retry in ${waitTime}s)`, {
+          failureCount: this.failureCount,
+          lastFailure: this.lastFailureTime,
+        });
 
         throw new Error(
           `Circuit breaker is OPEN for ${this.name}. Service is unavailable. Retry in ${waitTime}s.`,
@@ -148,23 +145,19 @@ export class CircuitBreaker {
 
     if (this.state === CircuitState.HALF_OPEN) {
       // Failed during recovery, go back to OPEN
-      this.logger.warn(
-        `${this.name}: Recovery failed, circuit breaker OPEN again`,
-        { error: errorMessage },
-      );
+      this.logger.warn(`${this.name}: Recovery failed, circuit breaker OPEN again`, {
+        error: errorMessage,
+      });
       this.state = CircuitState.OPEN;
       this.nextAttemptTime = new Date(Date.now() + this.config.timeout);
       this.successCount = 0;
     } else if (this.state === CircuitState.CLOSED) {
       // Check if we should open the circuit
       if (this.failureCount >= this.config.failureThreshold) {
-        this.logger.error(
-          `${this.name}: Circuit breaker OPEN (${this.failureCount} failures)`,
-          {
-            threshold: this.config.failureThreshold,
-            lastError: errorMessage,
-          },
-        );
+        this.logger.error(`${this.name}: Circuit breaker OPEN (${this.failureCount} failures)`, {
+          threshold: this.config.failureThreshold,
+          lastError: errorMessage,
+        });
         this.state = CircuitState.OPEN;
         this.nextAttemptTime = new Date(Date.now() + this.config.timeout);
       } else {

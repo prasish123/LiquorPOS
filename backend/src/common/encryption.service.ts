@@ -42,20 +42,15 @@ export class EncryptionService implements OnModuleInit {
             );
             this.oldEncryptionKey = null;
           } else {
-            this.logger.log(
-              'Key rotation mode enabled: OLD_AUDIT_LOG_ENCRYPTION_KEY detected',
-            );
+            this.logger.log('Key rotation mode enabled: OLD_AUDIT_LOG_ENCRYPTION_KEY detected');
           }
         } catch (error) {
-          this.logger.warn(
-            'OLD_AUDIT_LOG_ENCRYPTION_KEY is invalid format. Ignoring.',
-          );
+          this.logger.warn('OLD_AUDIT_LOG_ENCRYPTION_KEY is invalid format. Ignoring.');
           this.oldEncryptionKey = null;
         }
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(
         `Invalid AUDIT_LOG_ENCRYPTION_KEY format. Must be base64-encoded 32-byte key. ` +
           `Error: ${errorMessage}`,
@@ -106,9 +101,7 @@ export class EncryptionService implements OnModuleInit {
       const parts = ciphertext.split(':');
 
       if (parts.length !== 3) {
-        throw new Error(
-          'Invalid ciphertext format. Expected: iv:authTag:encryptedData',
-        );
+        throw new Error('Invalid ciphertext format. Expected: iv:authTag:encryptedData');
       }
 
       const iv = Buffer.from(parts[0], 'base64');
@@ -117,11 +110,7 @@ export class EncryptionService implements OnModuleInit {
 
       // Try current key first
       try {
-        const decipher = createDecipheriv(
-          this.algorithm,
-          this.encryptionKey,
-          iv,
-        );
+        const decipher = createDecipheriv(this.algorithm, this.encryptionKey, iv);
         decipher.setAuthTag(authTag);
 
         let decrypted = decipher.update(encrypted, 'base64', 'utf8');
@@ -132,19 +121,13 @@ export class EncryptionService implements OnModuleInit {
         // If current key fails and old key exists, try old key
         if (this.oldEncryptionKey) {
           try {
-            const decipher = createDecipheriv(
-              this.algorithm,
-              this.oldEncryptionKey,
-              iv,
-            );
+            const decipher = createDecipheriv(this.algorithm, this.oldEncryptionKey, iv);
             decipher.setAuthTag(authTag);
 
             let decrypted = decipher.update(encrypted, 'base64', 'utf8');
             decrypted += decipher.final('utf8');
 
-            this.logger.debug(
-              'Successfully decrypted with OLD_AUDIT_LOG_ENCRYPTION_KEY',
-            );
+            this.logger.debug('Successfully decrypted with OLD_AUDIT_LOG_ENCRYPTION_KEY');
             return decrypted;
           } catch (oldKeyError) {
             // Both keys failed
@@ -154,8 +137,7 @@ export class EncryptionService implements OnModuleInit {
         throw currentKeyError;
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Decryption failed: ${errorMessage}`);
     }
   }

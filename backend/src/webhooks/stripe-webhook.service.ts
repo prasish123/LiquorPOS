@@ -36,9 +36,7 @@ export class StripeWebhookService {
    */
   private initializeStripe(): void {
     if (!process.env.STRIPE_SECRET_KEY) {
-      this.logger.warn(
-        'STRIPE_SECRET_KEY not configured. Stripe webhooks will not work.',
-      );
+      this.logger.warn('STRIPE_SECRET_KEY not configured. Stripe webhooks will not work.');
       return;
     }
 
@@ -84,11 +82,7 @@ export class StripeWebhookService {
     try {
       // Verify webhook signature (if configured)
       if (this.webhookSecret) {
-        event = this.stripe.webhooks.constructEvent(
-          rawBody,
-          signature,
-          this.webhookSecret,
-        );
+        event = this.stripe.webhooks.constructEvent(rawBody, signature, this.webhookSecret);
         this.logger.log(`Webhook signature verified: ${event.type}`);
       } else {
         // Parse without verification (INSECURE - only for development)
@@ -98,11 +92,8 @@ export class StripeWebhookService {
         );
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Webhook signature verification failed: ${errorMessage}`,
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Webhook signature verification failed: ${errorMessage}`);
       throw new BadRequestException('Webhook signature verification failed');
     }
 
@@ -121,19 +112,14 @@ export class StripeWebhookService {
       // Mark as processed
       await this.webhooksService.markEventProcessed(eventId, true);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Failed to process webhook event ${event.id}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
 
       // Mark as failed
-      await this.webhooksService.markEventProcessed(
-        eventId,
-        false,
-        errorMessage,
-      );
+      await this.webhooksService.markEventProcessed(eventId, false, errorMessage);
 
       // Re-throw to trigger Stripe retry
       throw error;
@@ -199,9 +185,7 @@ export class StripeWebhookService {
    * Handle payment_intent.succeeded event
    * Payment completed successfully (async confirmation)
    */
-  private async handlePaymentIntentSucceeded(
-    paymentIntent: Stripe.PaymentIntent,
-  ): Promise<void> {
+  private async handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     this.logger.log(
       `Payment succeeded: ${paymentIntent.id}, Amount: $${paymentIntent.amount / 100}`,
     );
@@ -258,9 +242,7 @@ export class StripeWebhookService {
    * Handle payment_intent.payment_failed event
    * Async payment failure (after initial authorization)
    */
-  private async handlePaymentIntentFailed(
-    paymentIntent: Stripe.PaymentIntent,
-  ): Promise<void> {
+  private async handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     this.logger.error(
       `Payment failed: ${paymentIntent.id}, Reason: ${paymentIntent.last_payment_error?.message || 'Unknown'}`,
     );
@@ -316,9 +298,7 @@ export class StripeWebhookService {
   /**
    * Handle payment_intent.canceled event
    */
-  private async handlePaymentIntentCanceled(
-    paymentIntent: Stripe.PaymentIntent,
-  ): Promise<void> {
+  private async handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     this.logger.log(`Payment canceled: ${paymentIntent.id}`);
 
     try {
@@ -366,9 +346,7 @@ export class StripeWebhookService {
    * Customer-initiated or merchant refund
    */
   private async handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
-    this.logger.log(
-      `Charge refunded: ${charge.id}, Amount: $${charge.amount_refunded / 100}`,
-    );
+    this.logger.log(`Charge refunded: ${charge.id}, Amount: $${charge.amount_refunded / 100}`);
 
     try {
       // Find payment by charge's payment intent
@@ -421,9 +399,7 @@ export class StripeWebhookService {
 
     try {
       // Find payment by charge ID
-      const charge = await this.stripe?.charges.retrieve(
-        dispute.charge as string,
-      );
+      const charge = await this.stripe?.charges.retrieve(dispute.charge as string);
       const payment = await this.prisma.payment.findFirst({
         where: { processorId: charge?.payment_intent as string },
       });
@@ -473,9 +449,7 @@ export class StripeWebhookService {
     this.logger.log(`Dispute closed: ${dispute.id}, Status: ${dispute.status}`);
 
     try {
-      const charge = await this.stripe?.charges.retrieve(
-        dispute.charge as string,
-      );
+      const charge = await this.stripe?.charges.retrieve(dispute.charge as string);
       const payment = await this.prisma.payment.findFirst({
         where: { processorId: charge?.payment_intent as string },
       });
@@ -500,9 +474,7 @@ export class StripeWebhookService {
         },
       });
 
-      this.logger.log(
-        `Dispute ${dispute.id} closed with status: ${dispute.status}`,
-      );
+      this.logger.log(`Dispute ${dispute.id} closed with status: ${dispute.status}`);
     } catch (error) {
       this.logger.error(
         `Failed to handle charge.dispute.closed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -516,9 +488,7 @@ export class StripeWebhookService {
    * Handle payment_intent.amount_capturable_updated event
    * Authorization amount changed
    */
-  private async handleAmountCapturableUpdated(
-    paymentIntent: Stripe.PaymentIntent,
-  ): Promise<void> {
+  private async handleAmountCapturableUpdated(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     this.logger.log(
       `Amount capturable updated: ${paymentIntent.id}, ` +
         `New amount: $${paymentIntent.amount_capturable ? paymentIntent.amount_capturable / 100 : 0}`,
@@ -542,9 +512,7 @@ export class StripeWebhookService {
           payload: JSON.stringify({
             paymentIntentId: paymentIntent.id,
             oldAmount: payment.amount,
-            newAmount: paymentIntent.amount_capturable
-              ? paymentIntent.amount_capturable / 100
-              : 0,
+            newAmount: paymentIntent.amount_capturable ? paymentIntent.amount_capturable / 100 : 0,
           }),
           processed: true,
           processedAt: new Date(),
@@ -603,9 +571,7 @@ export class StripeWebhookService {
   /**
    * Handle payment_intent.capture_failed event
    */
-  private async handleCaptureFailed(
-    paymentIntent: Stripe.PaymentIntent,
-  ): Promise<void> {
+  private async handleCaptureFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     this.logger.error(
       `Capture failed: ${paymentIntent.id}, Reason: ${paymentIntent.last_payment_error?.message || 'Unknown'}`,
     );

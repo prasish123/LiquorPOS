@@ -71,9 +71,7 @@ describe('Connection Pool', () => {
     it('should have totalConnections = active + idle', async () => {
       const metrics = await prismaService.getPoolMetrics();
 
-      expect(metrics.totalConnections).toBe(
-        metrics.activeConnections + metrics.idleConnections,
-      );
+      expect(metrics.totalConnections).toBe(metrics.activeConnections + metrics.idleConnections);
     });
 
     it('should not exceed pool size', async () => {
@@ -105,10 +103,7 @@ describe('Connection Pool', () => {
   describe('Connection Reuse', () => {
     it('should reuse connections efficiently', async () => {
       // Make multiple queries
-      const queries = Array.from(
-        { length: 10 },
-        () => prismaService.$queryRaw`SELECT 1 as value`,
-      );
+      const queries = Array.from({ length: 10 }, () => prismaService.$queryRaw`SELECT 1 as value`);
 
       const startTime = Date.now();
       await Promise.all(queries);
@@ -137,8 +132,7 @@ describe('Connection Pool', () => {
       // Create 20 concurrent queries (may exceed pool size)
       const queries = Array.from(
         { length: 20 },
-        (_, i) =>
-          prismaService.$queryRaw<{ value: number }[]>`SELECT ${i} as value`,
+        (_, i) => prismaService.$queryRaw<{ value: number }[]>`SELECT ${i} as value`,
       );
 
       const results = await Promise.all(queries);
@@ -219,9 +213,7 @@ describe('Connection Pool', () => {
 
     it('should handle connection errors gracefully', async () => {
       // Test with invalid query
-      await expect(
-        prismaService.$queryRaw`SELECT * FROM nonexistent_table`,
-      ).rejects.toThrow();
+      await expect(prismaService.$queryRaw`SELECT * FROM nonexistent_table`).rejects.toThrow();
 
       // Pool should still be healthy after error
       const isHealthy = await prismaService.isPoolHealthy();
@@ -247,10 +239,7 @@ describe('Connection Pool', () => {
 
     it('should handle burst traffic', async () => {
       // Simulate burst of 50 concurrent requests
-      const queries = Array.from(
-        { length: 50 },
-        () => prismaService.$queryRaw`SELECT 1 as value`,
-      );
+      const queries = Array.from({ length: 50 }, () => prismaService.$queryRaw`SELECT 1 as value`);
 
       const startTime = Date.now();
       const results = await Promise.all(queries);

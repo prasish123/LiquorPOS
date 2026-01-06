@@ -107,9 +107,7 @@ describe('Inventory Race Condition Prevention (e2e)', () => {
       }));
 
       const results = await Promise.allSettled(
-        concurrentRequests.map((req) =>
-          inventoryAgent.checkAndReserve(testLocationId, req.items),
-        ),
+        concurrentRequests.map((req) => inventoryAgent.checkAndReserve(testLocationId, req.items)),
       );
 
       // Count successes and failures
@@ -163,9 +161,7 @@ describe('Inventory Race Condition Prevention (e2e)', () => {
       }));
 
       const results = await Promise.allSettled(
-        concurrentRequests.map((req) =>
-          inventoryAgent.checkAndReserve(testLocationId, req.items),
-        ),
+        concurrentRequests.map((req) => inventoryAgent.checkAndReserve(testLocationId, req.items)),
       );
 
       const successes = results.filter((r) => r.status === 'fulfilled').length;
@@ -197,26 +193,19 @@ describe('Inventory Race Condition Prevention (e2e)', () => {
       }
 
       // First, reserve some inventory
-      const initialReservation = await inventoryAgent.checkAndReserve(
-        testLocationId,
-        [{ sku: product.sku, quantity: 5 }],
-      );
+      const initialReservation = await inventoryAgent.checkAndReserve(testLocationId, [
+        { sku: product.sku, quantity: 5 },
+      ]);
 
       // Now run concurrent operations: some reserving, some releasing
       const operations = [
         // Try to reserve more
-        inventoryAgent.checkAndReserve(testLocationId, [
-          { sku: product.sku, quantity: 3 },
-        ]),
-        inventoryAgent.checkAndReserve(testLocationId, [
-          { sku: product.sku, quantity: 2 },
-        ]),
+        inventoryAgent.checkAndReserve(testLocationId, [{ sku: product.sku, quantity: 3 }]),
+        inventoryAgent.checkAndReserve(testLocationId, [{ sku: product.sku, quantity: 2 }]),
         // Release the initial reservation
         inventoryAgent.release(initialReservation, testLocationId),
         // Try to reserve again
-        inventoryAgent.checkAndReserve(testLocationId, [
-          { sku: product.sku, quantity: 4 },
-        ]),
+        inventoryAgent.checkAndReserve(testLocationId, [{ sku: product.sku, quantity: 4 }]),
       ];
 
       const results = await Promise.allSettled(operations);
@@ -229,9 +218,7 @@ describe('Inventory Race Condition Prevention (e2e)', () => {
       expect(finalInventory).not.toBeNull();
       if (finalInventory) {
         // Reserved should never exceed total quantity
-        expect(finalInventory.reserved).toBeLessThanOrEqual(
-          finalInventory.quantity,
-        );
+        expect(finalInventory.reserved).toBeLessThanOrEqual(finalInventory.quantity);
         // Reserved should be non-negative
         expect(finalInventory.reserved).toBeGreaterThanOrEqual(0);
         // Total quantity should remain unchanged
@@ -252,21 +239,16 @@ describe('Inventory Race Condition Prevention (e2e)', () => {
       // it fails gracefully without corrupting data
 
       // Create a reservation that will hold a lock
-      const reservation1Promise = inventoryAgent.checkAndReserve(
-        testLocationId,
-        [{ sku: product.sku, quantity: 5 }],
-      );
+      const reservation1Promise = inventoryAgent.checkAndReserve(testLocationId, [
+        { sku: product.sku, quantity: 5 },
+      ]);
 
       // Immediately try another reservation (might hit lock timeout)
-      const reservation2Promise = inventoryAgent.checkAndReserve(
-        testLocationId,
-        [{ sku: product.sku, quantity: 5 }],
-      );
-
-      const results = await Promise.allSettled([
-        reservation1Promise,
-        reservation2Promise,
+      const reservation2Promise = inventoryAgent.checkAndReserve(testLocationId, [
+        { sku: product.sku, quantity: 5 },
       ]);
+
+      const results = await Promise.allSettled([reservation1Promise, reservation2Promise]);
 
       // At least one should succeed
       const successes = results.filter((r) => r.status === 'fulfilled').length;
@@ -361,9 +343,7 @@ describe('Inventory Race Condition Prevention (e2e)', () => {
       }));
 
       // Commit all concurrently
-      await Promise.all(
-        reservations.map((res) => inventoryAgent.commit(res, testLocationId)),
-      );
+      await Promise.all(reservations.map((res) => inventoryAgent.commit(res, testLocationId)));
 
       // Verify final state
       const finalInventory = await prisma.inventory.findUnique({

@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsNumber,
-  IsNotEmpty,
-  IsOptional,
-  Min,
-} from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsOptional, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateInventoryDto {
@@ -114,8 +108,7 @@ export class AdjustInventoryDto {
   locationId: string;
 
   @ApiProperty({
-    description:
-      'Adjustment amount (positive for increase, negative for decrease)',
+    description: 'Adjustment amount (positive for increase, negative for decrease)',
     example: -5,
     type: Number,
   })
@@ -126,15 +119,7 @@ export class AdjustInventoryDto {
   @ApiPropertyOptional({
     description: 'Reason for adjustment',
     example: 'damage',
-    enum: [
-      'sale',
-      'restock',
-      'damage',
-      'theft',
-      'count',
-      'correction',
-      'return',
-    ],
+    enum: ['sale', 'restock', 'damage', 'theft', 'count', 'correction', 'return'],
     type: String,
   })
   @IsString()

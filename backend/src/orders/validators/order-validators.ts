@@ -16,8 +16,7 @@ export class IsValidIdempotencyKeyConstraint implements ValidatorConstraintInter
     if (typeof value !== 'string') return false;
 
     // Allow UUID v4 format or custom format (alphanumeric with hyphens, min 16 chars)
-    const uuidV4Regex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const customFormatRegex = /^[a-zA-Z0-9-_]{16,128}$/;
 
     return uuidV4Regex.test(value) || customFormatRegex.test(value);
@@ -142,22 +141,19 @@ export class IsUUIDOrCUIDConstraint implements ValidatorConstraintInterface {
     if (typeof value !== 'string') return false;
 
     // UUID v4 format
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     // CUID format (starts with 'c', 25 characters)
     const cuidRegex = /^c[a-z0-9]{24}$/i;
     // Custom ID format (alphanumeric, 8-36 characters)
     const customIdRegex = /^[a-zA-Z0-9_-]{8,36}$/;
 
-    return (
-      uuidRegex.test(value) ||
-      cuidRegex.test(value) ||
-      customIdRegex.test(value)
-    );
+    return uuidRegex.test(value) || cuidRegex.test(value) || customIdRegex.test(value);
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return `${args.property} must be a valid UUID, CUID, or custom ID format`;
+    const value = args.value;
+    return `${args.property} must be a valid UUID or CUID. Received: "${value}". ` +
+           `Please ensure your .env file contains valid UUIDs. Run setup-env.ps1 to generate proper configuration.`;
   }
 }
 

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, CSSProperties } from 'react';
 import { LucideIcon } from 'lucide-react';
 
 interface ModuleCardProps {
@@ -6,9 +6,10 @@ interface ModuleCardProps {
     variant?: 'compact' | 'standard' | 'expanded';
     onClick?: () => void;
     className?: string;
+    style?: CSSProperties;
 }
 
-export function ModuleCard({ children, variant = 'standard', onClick, className = '' }: ModuleCardProps) {
+export function ModuleCard({ children, variant = 'standard', onClick, className = '', style }: ModuleCardProps) {
     // Use the existing tile-card class from index.css
     const baseClasses = "tile-card";
     const variantClasses = {
@@ -22,6 +23,7 @@ export function ModuleCard({ children, variant = 'standard', onClick, className 
         <div 
             className={`${baseClasses} ${variantClasses[variant]} ${interactiveClasses} ${className}`}
             onClick={onClick}
+            style={style}
         >
             {children}
         </div>

@@ -34,12 +34,10 @@ describe('Backup System (e2e)', () => {
     });
 
     // Login to get token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .send({
-        username: 'admin-backup-test',
-        password: 'test123',
-      });
+    const loginResponse = await request(app.getHttpServer()).post('/api/auth/login').send({
+      username: 'admin-backup-test',
+      password: 'test123',
+    });
 
     adminToken = loginResponse.body.access_token;
   });
@@ -87,9 +85,7 @@ describe('Backup System (e2e)', () => {
     }, 60000); // 60 second timeout for backup creation
 
     it('should reject backup creation without admin token', async () => {
-      await request(app.getHttpServer())
-        .post('/api/backup/create')
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/backup/create').expect(401);
     });
 
     it('should reject backup creation with non-admin token', async () => {
@@ -105,12 +101,10 @@ describe('Backup System (e2e)', () => {
       });
 
       // Login as regular user
-      const loginResponse = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({
-          username: 'regular-user-test',
-          password: 'test123',
-        });
+      const loginResponse = await request(app.getHttpServer()).post('/api/auth/login').send({
+        username: 'regular-user-test',
+        password: 'test123',
+      });
 
       const regularToken = loginResponse.body.access_token;
 
@@ -145,9 +139,7 @@ describe('Backup System (e2e)', () => {
     });
 
     it('should reject list request without admin token', async () => {
-      await request(app.getHttpServer())
-        .get('/api/backup/list')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/backup/list').expect(401);
     });
   });
 
@@ -204,9 +196,7 @@ describe('Backup System (e2e)', () => {
 
   describe('GET /health/backup', () => {
     it('should return backup health status', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/health/backup')
-        .expect(200);
+      const response = await request(app.getHttpServer()).get('/health/backup').expect(200);
 
       expect(response.body).toHaveProperty('status');
       expect(response.body).toHaveProperty('info');
@@ -220,9 +210,7 @@ describe('Backup System (e2e)', () => {
     });
 
     it('should not require authentication for health check', async () => {
-      await request(app.getHttpServer())
-        .get('/health/backup')
-        .expect(200);
+      await request(app.getHttpServer()).get('/health/backup').expect(200);
     });
   });
 
@@ -315,9 +303,7 @@ describe('Backup System (e2e)', () => {
     });
 
     it('should handle missing authorization header', async () => {
-      await request(app.getHttpServer())
-        .post('/api/backup/create')
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/backup/create').expect(401);
     });
 
     it('should handle malformed JWT token', async () => {

@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -21,11 +11,7 @@ import {
   ApiSecurity,
 } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import {
-  CreateInventoryDto,
-  UpdateInventoryDto,
-  AdjustInventoryDto,
-} from './dto/inventory.dto';
+import { CreateInventoryDto, UpdateInventoryDto, AdjustInventoryDto } from './dto/inventory.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('inventory')
@@ -45,8 +31,7 @@ export class InventoryController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Create inventory record',
-    description:
-      'Create a new inventory record for a product at a specific location.',
+    description: 'Create a new inventory record for a product at a specific location.',
   })
   @ApiBody({ type: CreateInventoryDto })
   @ApiResponse({
@@ -80,8 +65,7 @@ export class InventoryController {
   @Get()
   @ApiOperation({
     summary: 'List all inventory',
-    description:
-      'Retrieve all inventory records with optional location filter.',
+    description: 'Retrieve all inventory records with optional location filter.',
   })
   @ApiQuery({
     name: 'locationId',
@@ -137,8 +121,7 @@ export class InventoryController {
   @Get('product/:productId')
   @ApiOperation({
     summary: 'Get inventory by product',
-    description:
-      'Retrieve inventory records for a specific product across all locations.',
+    description: 'Retrieve inventory records for a specific product across all locations.',
   })
   @ApiParam({
     name: 'productId',
@@ -264,8 +247,7 @@ export class InventoryController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Update inventory record',
-    description:
-      'Update inventory settings such as reorder point and reorder quantity.',
+    description: 'Update inventory settings such as reorder point and reorder quantity.',
   })
   @ApiParam({
     name: 'id',
@@ -294,10 +276,7 @@ export class InventoryController {
     status: 429,
     description: 'Too many requests',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateInventoryDto: UpdateInventoryDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateInventoryDto: UpdateInventoryDto) {
     return this.inventoryService.update(id, updateInventoryDto);
   }
 

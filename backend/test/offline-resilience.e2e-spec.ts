@@ -88,22 +88,14 @@ describe('Offline Resilience (e2e)', () => {
     });
 
     it('should check if offline payment is allowed', async () => {
-      const result = await offlinePayment.canProcessOffline(
-        100,
-        'cash',
-        testLocationId,
-      );
+      const result = await offlinePayment.canProcessOffline(100, 'cash', testLocationId);
 
       expect(result).toBeDefined();
       expect(result.allowed).toBeDefined();
     });
 
     it('should authorize cash payment in offline mode', async () => {
-      const result = await offlinePayment.authorizeOffline(
-        50,
-        'cash',
-        testLocationId,
-      );
+      const result = await offlinePayment.authorizeOffline(50, 'cash', testLocationId);
 
       expect(result).toBeDefined();
       expect(result.paymentId).toBeDefined();
@@ -115,11 +107,7 @@ describe('Offline Resilience (e2e)', () => {
       // Enable offline payments
       offlinePayment.updateConfig({ enabled: true, maxTransactionAmount: 500 });
 
-      const result = await offlinePayment.authorizeOffline(
-        100,
-        'card',
-        testLocationId,
-      );
+      const result = await offlinePayment.authorizeOffline(100, 'card', testLocationId);
 
       expect(result).toBeDefined();
       expect(result.paymentId).toBeDefined();
@@ -133,11 +121,7 @@ describe('Offline Resilience (e2e)', () => {
     it('should reject card payment exceeding limits', async () => {
       offlinePayment.updateConfig({ enabled: true, maxTransactionAmount: 100 });
 
-      const result = await offlinePayment.authorizeOffline(
-        500,
-        'card',
-        testLocationId,
-      );
+      const result = await offlinePayment.authorizeOffline(500, 'card', testLocationId);
 
       expect(result.status).toBe('failed');
       expect(result.errorMessage).toContain('exceeds offline limit');
@@ -147,9 +131,7 @@ describe('Offline Resilience (e2e)', () => {
       // Create a test offline payment
       await offlinePayment.authorizeOffline(100, 'card', testLocationId);
 
-      const pending = await offlinePayment.getPendingOfflinePayments(
-        testLocationId,
-      );
+      const pending = await offlinePayment.getPendingOfflinePayments(testLocationId);
 
       expect(Array.isArray(pending)).toBe(true);
     });
@@ -293,12 +275,7 @@ describe('Offline Resilience (e2e)', () => {
   describe('Error Handling', () => {
     it('should handle invalid queue operation types', async () => {
       // This should not throw, but the operation will fail when processed
-      const queueId = await offlineQueue.enqueue(
-        'invalid_type' as any,
-        { test: 'data' },
-        5,
-        1,
-      );
+      const queueId = await offlineQueue.enqueue('invalid_type' as any, { test: 'data' }, 5, 1);
 
       expect(queueId).toBeDefined();
     });
@@ -306,11 +283,7 @@ describe('Offline Resilience (e2e)', () => {
     it('should handle offline payment when disabled', async () => {
       offlinePayment.updateConfig({ enabled: false });
 
-      const result = await offlinePayment.authorizeOffline(
-        100,
-        'card',
-        'test-location',
-      );
+      const result = await offlinePayment.authorizeOffline(100, 'card', 'test-location');
 
       expect(result.status).toBe('failed');
       expect(result.errorMessage).toContain('not enabled');
@@ -320,4 +293,3 @@ describe('Offline Resilience (e2e)', () => {
     });
   });
 });
-

@@ -34,25 +34,19 @@ export class PriceOverrideService {
   /**
    * Request price override with manager PIN
    */
-  async requestOverride(
-    request: PriceOverrideRequest,
-  ): Promise<PriceOverrideResponse> {
+  async requestOverride(request: PriceOverrideRequest): Promise<PriceOverrideResponse> {
     // Step 1: Authenticate manager by PIN
     const manager = await this.pinAuth.authenticateByPin(request.managerPin);
 
     // Step 2: Validate manager role
     const isManager = await this.pinAuth.validateManagerRole(manager.userId);
     if (!isManager) {
-      throw new ForbiddenException(
-        'Only managers and admins can override prices',
-      );
+      throw new ForbiddenException('Only managers and admins can override prices');
     }
 
     // Step 3: Validate override amount (prevent abuse)
     const discountPercent =
-      ((request.originalPrice - request.overridePrice) /
-        request.originalPrice) *
-      100;
+      ((request.originalPrice - request.overridePrice) / request.originalPrice) * 100;
 
     // Warn if discount > 50% (but still allow)
     if (discountPercent > 50) {
@@ -208,4 +202,3 @@ export class PriceOverrideService {
     };
   }
 }
-

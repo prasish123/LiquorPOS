@@ -85,8 +85,7 @@ export class AppException extends HttpException {
   constructor(code: ErrorCode, options?: AppExceptionOptions) {
     const metadata = ERROR_METADATA[code];
     const userMessage = options?.userMessage || metadata.userMessage;
-    const internalMessage =
-      options?.internalMessage || metadata.internalMessage;
+    const internalMessage = options?.internalMessage || metadata.internalMessage;
 
     super(
       {
@@ -172,10 +171,7 @@ export class AppException extends HttpException {
  * Authentication Exception (401)
  */
 export class AuthenticationException extends AppException {
-  constructor(
-    code: ErrorCode = ErrorCode.AUTH_INVALID_CREDENTIALS,
-    options?: AppExceptionOptions,
-  ) {
+  constructor(code: ErrorCode = ErrorCode.AUTH_INVALID_CREDENTIALS, options?: AppExceptionOptions) {
     super(code, options);
   }
 }
@@ -280,10 +276,7 @@ export class ExternalServiceException extends AppException {
  * Internal Server Exception (500)
  */
 export class InternalServerException extends AppException {
-  constructor(
-    code: ErrorCode = ErrorCode.SYSTEM_INTERNAL_ERROR,
-    options?: AppExceptionOptions,
-  ) {
+  constructor(code: ErrorCode = ErrorCode.SYSTEM_INTERNAL_ERROR, options?: AppExceptionOptions) {
     super(code, options);
   }
 }
@@ -295,17 +288,13 @@ export class InternalServerException extends AppException {
 /**
  * Create a validation exception from class-validator errors
  */
-export function createValidationException(
-  classValidatorErrors: any[],
-): ValidationException {
-  const validationErrors: ValidationError[] = classValidatorErrors.map(
-    (error) => ({
-      field: error.property,
-      message: Object.values(error.constraints || {}).join(', '),
-      value: error.value,
-      constraints: error.constraints,
-    }),
-  );
+export function createValidationException(classValidatorErrors: any[]): ValidationException {
+  const validationErrors: ValidationError[] = classValidatorErrors.map((error) => ({
+    field: error.property,
+    message: Object.values(error.constraints || {}).join(', '),
+    value: error.value,
+    constraints: error.constraints,
+  }));
 
   return new ValidationException(ErrorCode.VALIDATION_FAILED, validationErrors);
 }
@@ -339,8 +328,7 @@ export function toAppException(error: any): AppException {
   if (error instanceof HttpException) {
     const status = error.getStatus();
     const response = error.getResponse();
-    const message =
-      typeof response === 'string' ? response : (response as any).message;
+    const message = typeof response === 'string' ? response : (response as any).message;
 
     // Map HTTP status to error code
     let code: ErrorCode;

@@ -132,7 +132,7 @@ export function AdminDashboard() {
 }
 
 function StatModule({ icon: Icon, title, value, change, trend, delay }: any) {
-    const trendColors = {
+    const trendColors: Record<string, string> = {
         up: '#10b981',  // emerald-500
         down: '#ef4444', // rose-500
         neutral: '#64748b' // slate-500
@@ -145,7 +145,7 @@ function StatModule({ icon: Icon, title, value, change, trend, delay }: any) {
                     <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--gradient-subtle)', color: 'var(--color-primary)' }}>
                         <Icon size={22} strokeWidth={2.5} />
                     </div>
-                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: trendColors[trend] }}>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: trendColors[trend as string] || trendColors.neutral }}>
                         {change}
                     </div>
                 </div>

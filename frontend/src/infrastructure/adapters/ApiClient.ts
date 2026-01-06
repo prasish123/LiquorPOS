@@ -1,6 +1,7 @@
 import { orderRepository } from '../repositories/OrderRepository';
 import { Product, Order } from '../../domain/types';
 import { Logger } from '../services/LoggerService';
+import { validateIds } from '../../utils/validation';
 
 // Re-export types for compatibility
 export type { Product };
@@ -26,6 +27,9 @@ class ApiClient {
     // ... search methods ...
 
     async createOrder(orderRequest: CreateOrderRequest): Promise<OrderResponse> {
+        // Validate UUIDs before proceeding
+        validateIds(orderRequest.locationId, orderRequest.terminalId || '');
+        
         const id = crypto.randomUUID();
         const timestamp = Date.now();
 
@@ -92,17 +96,25 @@ class ApiClient {
                 await orderRepository.save(order);
             } else {
                 const errorText = await response.text();
-                Logger.error("Failed to sync order to backend", { 
+                Logger.error("Failed to sync order to backend", undefined, { 
                     orderId: id, 
                     status: response.status,
-                    error: errorText 
+                    errorText 
                 });
-                // Order still saved locally, will sync later
+                
+                // Show warning toast for sync failure
+                if (typeof window !== 'undefined') {
+                    const { useToastStore } = await import('../../store/toastStore');
+                    useToastStore.getState().addToast({
+                        type: 'warning',
+                        message: 'Transaction saved locally. Backend sync failed - will retry automatically.',
+                        duration: 5000,
+                    });
+                }
             }
         } catch (error) {
-            Logger.error("Error syncing order to backend", { 
-                orderId: id, 
-                error: error instanceof Error ? error.message : 'Unknown error' 
+            Logger.error("Error syncing order to backend", error instanceof Error ? error : undefined, { 
+                orderId: id
             });
             // Order still saved locally, will sync later
         }

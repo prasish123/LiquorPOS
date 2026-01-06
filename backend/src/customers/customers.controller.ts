@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -43,8 +33,7 @@ export class CustomersController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Create a new customer',
-    description:
-      'Register a new customer with contact information and loyalty program enrollment.',
+    description: 'Register a new customer with contact information and loyalty program enrollment.',
   })
   @ApiBody({ type: CreateCustomerDto })
   @ApiResponse({
@@ -99,10 +88,7 @@ export class CustomersController {
     description: 'Unauthorized',
   })
   findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.customersService.findAll(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 50,
-    );
+    return this.customersService.findAll(page ? parseInt(page) : 1, limit ? parseInt(limit) : 50);
   }
 
   /**
@@ -260,8 +246,7 @@ export class CustomersController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Update customer',
-    description:
-      'Update customer information including contact details and loyalty tier.',
+    description: 'Update customer information including contact details and loyalty tier.',
   })
   @ApiParam({
     name: 'id',
@@ -286,10 +271,7 @@ export class CustomersController {
     status: 403,
     description: 'Invalid CSRF token',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateCustomerDto: UpdateCustomerDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
     return this.customersService.update(id, updateCustomerDto);
   }
 
@@ -330,10 +312,7 @@ export class CustomersController {
     @Param('id') id: string,
     @Body() updateLoyaltyPointsDto: UpdateLoyaltyPointsDto,
   ) {
-    return this.customersService.updateLoyaltyPoints(
-      id,
-      updateLoyaltyPointsDto,
-    );
+    return this.customersService.updateLoyaltyPoints(id, updateLoyaltyPointsDto);
   }
 
   /**
@@ -344,8 +323,7 @@ export class CustomersController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Delete customer',
-    description:
-      'Remove a customer from the system. This action cannot be undone.',
+    description: 'Remove a customer from the system. This action cannot be undone.',
   })
   @ApiParam({
     name: 'id',

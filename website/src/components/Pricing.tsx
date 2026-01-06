@@ -1,14 +1,39 @@
-import React from 'react';
 import './Pricing.css';
+import { useEffect, useRef, useState } from 'react';
 
-const Pricing: React.FC = () => {
+const Pricing = () => {
+  const [isVisible, setIsVisible] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = sectionRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, []);
+
   return (
-    <section className="pricing">
+    <section className="pricing" ref={sectionRef}>
       <h2 className="section-title">Simple pricing</h2>
       <p className="pricing-subtitle">No surprises. No hidden fees. Cancel anytime.</p>
       
       <div className="pricing-card-container">
-        <div className="pricing-card">
+        <div className={`pricing-card ${isVisible ? 'visible' : ''}`}>
           <div className="pricing-header">
             <h3>Professional</h3>
             <div className="price">
@@ -34,12 +59,24 @@ const Pricing: React.FC = () => {
           <a href="#trial" className="btn btn-primary btn-full">Start 30-day free trial</a>
           
           <div className="pricing-note">
-            <p><strong>No transaction fees from us.</strong> No long-term contract.</p>
+            <p><strong>No transaction fees from us.</strong> No long-term contract. Cancel anytime.</p>
+          </div>
+          
+          <div className="pricing-wont-pay">
+            <h4>What you WON'T pay</h4>
+            <ul>
+              <li>❌ Infrastructure fees</li>
+              <li>❌ Training costs (included)</li>
+              <li>❌ Integration fees ($5K saved)</li>
+              <li>❌ Hidden charges</li>
+              <li>❌ Setup fees</li>
+              <li>❌ Long-term contracts</li>
+            </ul>
           </div>
         </div>
       </div>
 
-      <div className="pricing-additional">
+      <div className={`pricing-additional ${isVisible ? 'visible' : ''}`}>
         <div className="additional-item">
           <h4>💳 Payment Processing</h4>
           <p>Use your existing Stripe account (2.9% + $0.30). We can help you set up Stripe if needed. Stripe fees paid directly to Stripe, not us.</p>
@@ -50,7 +87,7 @@ const Pricing: React.FC = () => {
         </div>
       </div>
 
-      <div className="pricing-savings">
+      <div className={`pricing-savings ${isVisible ? 'visible' : ''}`}>
         <h3>Cost comparison: 3 terminals</h3>
         <div className="comparison">
           <div className="comparison-item">

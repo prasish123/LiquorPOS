@@ -1,10 +1,4 @@
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { LoggerService } from '../logger.service';
 import {
@@ -187,11 +181,7 @@ export class AppExceptionFilter implements ExceptionFilter {
   /**
    * Log error with appropriate level and context
    */
-  private logError(
-    exception: AppException,
-    request: Request,
-    requestId: string,
-  ): void {
+  private logError(exception: AppException, request: Request, requestId: string): void {
     const logContext = {
       requestId,
       method: request.method,

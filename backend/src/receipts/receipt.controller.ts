@@ -13,18 +13,14 @@ export class ReceiptController {
   @Post(':transactionId/generate')
   @ApiOperation({ summary: 'Generate receipt for transaction' })
   async generateReceipt(@Param('transactionId') transactionId: string) {
-    const receiptText = await this.receiptService.generateReceipt(
-      transactionId,
-    );
+    const receiptText = await this.receiptService.generateReceipt(transactionId);
     return { receipt: receiptText };
   }
 
   @Get(':transactionId')
   @ApiOperation({ summary: 'Get receipt text' })
   async getReceipt(@Param('transactionId') transactionId: string) {
-    const receiptText = await this.receiptService.reprintReceipt(
-      transactionId,
-    );
+    const receiptText = await this.receiptService.reprintReceipt(transactionId);
     return { receipt: receiptText };
   }
 
@@ -42,4 +38,3 @@ export class ReceiptController {
     return { message: 'Receipt printed to console' };
   }
 }
-

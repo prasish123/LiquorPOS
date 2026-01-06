@@ -5,11 +5,7 @@ import { OrdersService } from '../../orders/orders.service';
 import { ProductsService } from '../../products/products.service';
 import { LoggerService } from '../../common/logger.service';
 import { PrismaService } from '../../prisma.service';
-import {
-  ConexxusHttpClient,
-  ConexxusItem,
-  ConexxusSalesData,
-} from './conexxus-http.client';
+import { ConexxusHttpClient, ConexxusItem, ConexxusSalesData } from './conexxus-http.client';
 import { CircuitState } from './circuit-breaker';
 
 export interface SyncMetrics {
@@ -61,21 +57,16 @@ export class ConexxusService {
     private prisma: PrismaService,
   ) {
     // Check if Conexxus is configured
-    this.isEnabled = !!(
-      process.env.CONEXXUS_API_URL && process.env.CONEXXUS_API_KEY
-    );
+    this.isEnabled = !!(process.env.CONEXXUS_API_URL && process.env.CONEXXUS_API_KEY);
 
     if (this.isEnabled) {
       try {
         this.httpClient = new ConexxusHttpClient(this.prisma);
-        this.logger.log(
-          'Conexxus service initialized with HTTP client and circuit breaker',
-        );
+        this.logger.log('Conexxus service initialized with HTTP client and circuit breaker');
       } catch (error) {
         this.httpClient = null;
         this.isEnabled = false;
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         this.logger.error(
           `Failed to initialize Conexxus HTTP client: ${errorMessage}. Integration disabled.`,
           error instanceof Error ? error.stack : undefined,
@@ -83,9 +74,7 @@ export class ConexxusService {
       }
     } else {
       this.httpClient = null;
-      this.logger.warn(
-        'Conexxus integration disabled: API URL or API Key not configured',
-      );
+      this.logger.warn('Conexxus integration disabled: API URL or API Key not configured');
     }
   }
 
@@ -133,8 +122,7 @@ export class ConexxusService {
           metrics.itemsSucceeded++;
         } catch (error) {
           metrics.itemsFailed++;
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           metrics.errors.push({
             item: item.sku,
             error: errorMessage,
@@ -149,11 +137,7 @@ export class ConexxusService {
 
       // Determine sync status
       const status =
-        metrics.itemsFailed === 0
-          ? 'success'
-          : metrics.itemsSucceeded > 0
-            ? 'partial'
-            : 'failed';
+        metrics.itemsFailed === 0 ? 'success' : metrics.itemsSucceeded > 0 ? 'partial' : 'failed';
 
       this.updateSyncStatus(status, metrics);
 
@@ -166,8 +150,7 @@ export class ConexxusService {
 
       return metrics;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const stack = error instanceof Error ? error.stack : undefined;
 
       metrics.errors.push({
@@ -186,8 +169,7 @@ export class ConexxusService {
       throw error;
     } finally {
       metrics.endTime = new Date();
-      metrics.duration =
-        metrics.endTime.getTime() - metrics.startTime.getTime();
+      metrics.duration = metrics.endTime.getTime() - metrics.startTime.getTime();
       this.addMetrics(metrics);
     }
   }
@@ -218,8 +200,7 @@ export class ConexxusService {
         name: item.name,
         basePrice: item.price,
         category: item.category || existingProduct.category,
-        description:
-          item.description || existingProduct.description || undefined,
+        description: item.description || existingProduct.description || undefined,
       });
 
       this.logger.debug(`Updated product ${item.sku}`, {
@@ -265,9 +246,7 @@ export class ConexxusService {
       return;
     }
 
-    this.logger.log(
-      `Starting scheduled daily sales push to Conexxus for ${date.toDateString()}`,
-    );
+    this.logger.log(`Starting scheduled daily sales push to Conexxus for ${date.toDateString()}`);
 
     try {
       // Get daily sales summary
@@ -301,8 +280,7 @@ export class ConexxusService {
         transactionCount: salesData.transactions.length,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const stack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error('Failed to push sales data to Conexxus', stack, {
@@ -334,8 +312,7 @@ export class ConexxusService {
     if (!this.isEnabled || !this.httpClient) {
       return {
         success: false,
-        message:
-          'Conexxus integration not enabled: API URL or API Key not configured',
+        message: 'Conexxus integration not enabled: API URL or API Key not configured',
       };
     }
 
@@ -352,8 +329,7 @@ export class ConexxusService {
 
       return result;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       this.logger.error('Connection test failed', undefined, {
         error: errorMessage,
@@ -398,9 +374,7 @@ export class ConexxusService {
     const apiConnection = await this.httpClient.healthCheck();
 
     return {
-      isHealthy:
-        apiConnection &&
-        (!this.lastSyncStatus || this.lastSyncStatus !== 'failed'),
+      isHealthy: apiConnection && (!this.lastSyncStatus || this.lastSyncStatus !== 'failed'),
       lastSyncTime: this.lastSyncTime,
       lastSyncStatus: this.lastSyncStatus,
       lastError: this.lastError,

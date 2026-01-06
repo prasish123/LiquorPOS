@@ -91,9 +91,7 @@ describe('CircuitBreaker', () => {
 
       // Next call should fail fast without calling the function
       const callCount = mockFn.mock.calls.length;
-      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow(
-        'Circuit breaker is OPEN',
-      );
+      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('Circuit breaker is OPEN');
       expect(mockFn.mock.calls.length).toBe(callCount); // Not called again
     });
   });
@@ -140,9 +138,7 @@ describe('CircuitBreaker', () => {
 
       const mockFn = jest.fn().mockRejectedValue(new Error('still failing'));
 
-      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow(
-        'still failing',
-      );
+      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('still failing');
       expect(circuitBreaker.isOpen()).toBe(true);
     });
   });
@@ -230,9 +226,7 @@ describe('CircuitBreaker', () => {
         throw new Error('sync error');
       });
 
-      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow(
-        'sync error',
-      );
+      await expect(circuitBreaker.execute(mockFn)).rejects.toThrow('sync error');
       expect(circuitBreaker.getStats().failureCount).toBe(1);
     });
 

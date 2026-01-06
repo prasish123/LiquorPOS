@@ -1,12 +1,37 @@
-import React from 'react';
 import './Features.css';
+import { useEffect, useRef, useState } from 'react';
 
-const Features: React.FC = () => {
+const Features = () => {
+  const [visibleRows, setVisibleRows] = useState<boolean[]>([false, false, false]);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleRows([true, true, true]);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = sectionRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, []);
+
   return (
-    <section className="features">
+    <section className="features" ref={sectionRef}>
       <h2 className="section-title">Everything you need</h2>
       
-      <div className="feature-row">
+      <div className={`feature-row ${visibleRows[0] ? 'visible' : ''}`}>
         <div className="feature-content">
           <h3>Multi-channel pricing</h3>
           <p>Different prices for in-store, DoorDash, and e-commerce. Automatic pricing by source. Maximize profit on every channel.</p>
@@ -24,7 +49,7 @@ const Features: React.FC = () => {
         </div>
       </div>
 
-      <div className="feature-row reverse">
+      <div className={`feature-row reverse ${visibleRows[1] ? 'visible' : ''}`}>
         <div className="feature-content">
           <h3>Profit calculator</h3>
           <p>See real-time profit margins. Price with confidence. Never sell below cost. Set target profit percentage and we calculate the price.</p>
@@ -42,7 +67,7 @@ const Features: React.FC = () => {
         </div>
       </div>
 
-      <div className="feature-row">
+      <div className={`feature-row ${visibleRows[2] ? 'visible' : ''}`}>
         <div className="feature-content">
           <h3>Smart inventory alerts</h3>
           <p>Predicts stockouts based on sales velocity. Shows last purchase price and reorder quantity. Never run out of best-sellers.</p>

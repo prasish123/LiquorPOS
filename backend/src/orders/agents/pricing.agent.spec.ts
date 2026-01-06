@@ -126,9 +126,7 @@ describe('PricingAgent', () => {
     it('should use default tax rate when database error occurs', async () => {
       const locationId = 'loc-error';
 
-      jest
-        .spyOn(prisma.location, 'findUnique')
-        .mockRejectedValue(new Error('Database error'));
+      jest.spyOn(prisma.location, 'findUnique').mockRejectedValue(new Error('Database error'));
 
       const result = await agent.calculate(orderItems, locationId);
 

@@ -80,8 +80,7 @@ describe('RedisService - Sentinel Mode', () => {
     it('should enable Sentinel mode when all required env vars are set', async () => {
       process.env.REDIS_SENTINEL_ENABLED = 'true';
       process.env.REDIS_SENTINEL_MASTER_NAME = 'mymaster';
-      process.env.REDIS_SENTINELS =
-        'sentinel1:26379,sentinel2:26379,sentinel3:26379';
+      process.env.REDIS_SENTINELS = 'sentinel1:26379,sentinel2:26379,sentinel3:26379';
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [RedisService],
@@ -134,8 +133,7 @@ describe('RedisService - Sentinel Mode', () => {
     it('should parse sentinel nodes correctly', async () => {
       process.env.REDIS_SENTINEL_ENABLED = 'true';
       process.env.REDIS_SENTINEL_MASTER_NAME = 'mymaster';
-      process.env.REDIS_SENTINELS =
-        'sentinel1:26379,sentinel2:26380,sentinel3:26381';
+      process.env.REDIS_SENTINELS = 'sentinel1:26379,sentinel2:26380,sentinel3:26381';
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [RedisService],
@@ -155,8 +153,7 @@ describe('RedisService - Sentinel Mode', () => {
     it('should handle whitespace in sentinel configuration', async () => {
       process.env.REDIS_SENTINEL_ENABLED = 'true';
       process.env.REDIS_SENTINEL_MASTER_NAME = 'mymaster';
-      process.env.REDIS_SENTINELS =
-        ' sentinel1:26379 , sentinel2:26379 , sentinel3:26379 ';
+      process.env.REDIS_SENTINELS = ' sentinel1:26379 , sentinel2:26379 , sentinel3:26379 ';
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [RedisService],
@@ -175,8 +172,7 @@ describe('RedisService - Sentinel Mode', () => {
     it('should include Sentinel info in health status when in Sentinel mode', async () => {
       process.env.REDIS_SENTINEL_ENABLED = 'true';
       process.env.REDIS_SENTINEL_MASTER_NAME = 'mymaster';
-      process.env.REDIS_SENTINELS =
-        'sentinel1:26379,sentinel2:26379,sentinel3:26379';
+      process.env.REDIS_SENTINELS = 'sentinel1:26379,sentinel2:26379,sentinel3:26379';
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [RedisService],
@@ -210,8 +206,7 @@ describe('RedisService - Sentinel Mode', () => {
     it('should initialize failover count to 0', async () => {
       process.env.REDIS_SENTINEL_ENABLED = 'true';
       process.env.REDIS_SENTINEL_MASTER_NAME = 'mymaster';
-      process.env.REDIS_SENTINELS =
-        'sentinel1:26379,sentinel2:26379,sentinel3:26379';
+      process.env.REDIS_SENTINELS = 'sentinel1:26379,sentinel2:26379,sentinel3:26379';
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [RedisService],
@@ -230,8 +225,7 @@ describe('RedisService - Sentinel Mode', () => {
     it('should initialize in Sentinel mode with correct configuration', async () => {
       process.env.REDIS_SENTINEL_ENABLED = 'true';
       process.env.REDIS_SENTINEL_MASTER_NAME = 'mymaster';
-      process.env.REDIS_SENTINELS =
-        'sentinel1:26379,sentinel2:26379,sentinel3:26379';
+      process.env.REDIS_SENTINELS = 'sentinel1:26379,sentinel2:26379,sentinel3:26379';
 
       const module: TestingModule = await Test.createTestingModule({
         providers: [RedisService],

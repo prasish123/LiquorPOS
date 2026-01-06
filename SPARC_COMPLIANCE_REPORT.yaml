@@ -1,0 +1,331 @@
+# ==============================================================================
+# SPARC v0.7 COMPLIANCE REPORT
+# ==============================================================================
+# Generated: 2026-01-05
+# Authority: SPARC v0.7 (SPARC.yaml)
+# Source: observed_system.yaml, observed_flows.yaml, observed_non_functional.yaml
+# ==============================================================================
+
+gaps:
+  
+  - sparc_section: "workflows.price_override_authorization (lines 575-608)"
+    observed_behavior: |
+      ManagerOverride component exists in frontend (frontend/src/components/ManagerOverride.tsx).
+      Backend PriceOverrideService implements PIN validation and audit logging.
+      No UI trigger in POS terminal to request price override.
+    missing_or_noncompliant_behavior: |
+      SPARC line 607 states "integration_gap: ManagerOverride component exists but not integrated into POS UI".
+      Workflow cannot be executed from POS terminal. Component orphaned.
+    severity: HIGH
+  
+  - sparc_section: "workflows.receipt_generation (lines 663-680)"
+    observed_behavior: |
+      Backend receipt API implemented (POST /receipts/:transactionId/generate).
+      Receipt table stores content and htmlContent.
+      Frontend Checkout component does not call receipt API after transaction.
+    missing_or_noncompliant_behavior: |
+      SPARC line 679 states "integration_gap: Frontend doesn't call receipt API after checkout".
+      Receipt records never created. Receipt.printedAt and reprintCount never tracked.
+    severity: HIGH
+  
+  - sparc_section: "domains.reporting_and_analytics (lines 438-461)"
+    observed_behavior: |
+      Backend reporting APIs implemented (GET /reporting/sales/daily, etc.).
+      Export formats (CSV, Excel, PDF) supported.
+      Frontend admin panel displays mock data, no backend API calls.
+    missing_or_noncompliant_behavior: |
+      observed_flows.yaml lines 315-322: "reality: ALL DATA IS MOCK (hardcoded in components)".
+      Managers cannot generate reports from UI.
+    severity: HIGH
+  
+  - sparc_section: "domains.product_catalog (lines 109-160)"
+    observed_behavior: |
+      Backend product management APIs implemented (POST/GET/PUT/DELETE /api/products).
+      Frontend admin panel shows mock product data.
+      No create/edit/delete functionality in UI.
+    missing_or_noncompliant_behavior: |
+      observed_flows.yaml lines 362-369: "Button is placeholder, no functionality".
+      Product management capabilities defined in SPARC but not accessible from UI.
+    severity: HIGH
+  
+  - sparc_section: "domains.customer_management (lines 299-324)"
+    observed_behavior: |
+      Backend customer APIs implemented (POST/GET/PUT /api/customers).
+      Loyalty points tracking in database.
+      No customer lookup or loyalty UI in POS terminal.
+    missing_or_noncompliant_behavior: |
+      observed_flows.yaml lines 533-534: "No customer lookup, No loyalty points".
+      Customer management capabilities defined in SPARC but not accessible from POS.
+    severity: MEDIUM
+  
+  - sparc_section: "invariants.tax_calculation (lines 839-845)"
+    observed_behavior: |
+      Frontend CartLogic.ts hardcodes 7% tax rate.
+      Backend PricingAgent trusts frontend calculation.
+      Location.taxRate and Location.countyTaxRate exist in database but not used.
+    missing_or_noncompliant_behavior: |
+      SPARC line 844 states "issue: Tax rate hardcoded at 7% in frontend CartLogic.ts".
+      Tax not calculated from location-specific rates as SPARC defines.
+    severity: HIGH
+  
+  - sparc_section: "workflows.delivery_platform_webhook_processing (lines 708-729)"
+    observed_behavior: |
+      Uber Eats and DoorDash webhook endpoints implemented.
+      Signature verification not implemented, logs warning.
+      Accepts all webhook payloads.
+    missing_or_noncompliant_behavior: |
+      SPARC line 728 states "security_gap: Signature verification not implemented".
+      Webhooks processed without authentication.
+    severity: HIGH
+  
+  - sparc_section: "non_functional.operability.backup_restore (lines 1244-1253)"
+    observed_behavior: |
+      Automated daily backups at 2 AM with checksum verification.
+      Backups stored in ./backend/backups/ with 30-day retention.
+      No automated restore testing.
+    missing_or_noncompliant_behavior: |
+      SPARC line 1252 states "No automated restore testing".
+      Backup integrity unverified through actual restoration.
+    severity: MEDIUM
+  
+  - sparc_section: "non_functional.observability.metrics_export (lines 1128-1139)"
+    observed_behavior: |
+      Business and system metrics collected in-memory.
+      MetricsService tracks counters, histograms, gauges.
+      No Prometheus exporter implemented.
+    missing_or_noncompliant_behavior: |
+      SPARC lines 1136-1138 state "gaps: No Prometheus exporter, No Grafana dashboard".
+      Metrics not exportable for external monitoring systems.
+    severity: MEDIUM
+  
+  - sparc_section: "non_functional.security.data_encryption_at_rest (lines 1074-1084)"
+    observed_behavior: |
+      AuditLog.details encrypted with AES-256-GCM.
+      PostgreSQL database files not encrypted.
+      Backups not encrypted.
+    missing_or_noncompliant_behavior: |
+      SPARC lines 1081-1083 state "gaps: Database not encrypted at rest, Only audit logs encrypted".
+      Customer PII and payment data stored unencrypted.
+    severity: MEDIUM
+  
+  - sparc_section: "non_functional.observability.distributed_tracing (lines 1141-1149)"
+    observed_behavior: |
+      Correlation IDs tracked via CLS namespace.
+      Correlation IDs in logs and response headers.
+      No OpenTelemetry or Jaeger integration.
+    missing_or_noncompliant_behavior: |
+      SPARC lines 1147-1148 state "gaps: No distributed tracing (OpenTelemetry, Jaeger)".
+      Request spans not tracked across services.
+    severity: LOW
+  
+  - sparc_section: "non_functional.scalability.horizontal_scaling (lines 1027-1034)"
+    observed_behavior: |
+      Single-instance deployment model.
+      In-memory cache in RedisService (100-entry LRU).
+      Rate limits stored in Redis but not shared across instances.
+    missing_or_noncompliant_behavior: |
+      SPARC lines 1030-1032 state "limitations: In-memory cache not shared, Rate limits not shared, No built-in load balancing".
+      System cannot scale horizontally without manual configuration.
+    severity: MEDIUM
+  
+  - sparc_section: "non_functional.availability.single_point_of_failure (lines 953-976)"
+    observed_behavior: |
+      PostgreSQL has no automatic failover.
+      Database connection pooling with automatic reconnection.
+      Health checks detect database unavailability.
+    missing_or_noncompliant_behavior: |
+      SPARC line 965 states "single_point_of_failure: PostgreSQL (no built-in failover)".
+      Database failure causes complete system outage.
+    severity: HIGH
+  
+  - sparc_section: "non_functional.reliability.error_handling (lines 916-926)"
+    observed_behavior: |
+      Global error handlers for uncaughtException, unhandledRejection, SIGTERM, SIGINT.
+      uncaughtException terminates process with exit code 1.
+      unhandledRejection logs warning but does not terminate.
+    missing_or_noncompliant_behavior: |
+      SPARC line 925 states "issue: unhandledRejection does NOT terminate process (potential memory leak)".
+      Process continues running after unhandled promise rejections.
+    severity: MEDIUM
+  
+  - sparc_section: "workflows.offline_transaction_sync (lines 731-753)"
+    observed_behavior: |
+      OfflineQueueService processes queue every 5 minutes.
+      Backend tracks pending, processing, completed, failed operations.
+      No frontend offline indicator or queue status display.
+    missing_or_noncompliant_behavior: |
+      observed_flows.yaml lines 551-554 state "Unclear if offline sync actually works".
+      Cashiers have no visibility into offline mode status.
+    severity: MEDIUM
+  
+  - sparc_section: "domains.location_management (lines 389-414)"
+    observed_behavior: |
+      Location table has taxRate and countyTaxRate fields.
+      Backend location APIs implemented.
+      Frontend does not fetch location data for tax calculation.
+    missing_or_noncompliant_behavior: |
+      Frontend VITE_LOCATION_ID set at build time, not runtime.
+      Cannot switch locations without frontend rebuild.
+    severity: MEDIUM
+
+violations:
+  
+  - invariant_id: "invariants.tax_calculation (lines 839-845)"
+    evidence: |
+      SPARC line 841 states "default: 7% Florida state tax (Location.taxRate)".
+      SPARC line 842 states "optional: County tax (Location.countyTaxRate)".
+      SPARC line 843 states "source_of_truth: POS frontend calculates, backend trusts if provided".
+      
+      observed_flows.yaml lines 227-232: "Tax rate hardcoded at 7% in CartLogic (Florida default)".
+      frontend/src/domain/CartLogic.ts: const TAX_RATE = 0.07 (hardcoded).
+      
+      Frontend does not fetch Location.taxRate from backend.
+      Multi-location deployments with different tax rates calculate incorrect totals.
+    severity: HIGH
+  
+  - invariant_id: "invariants.receipt_persistence (lines 864-869)"
+    evidence: |
+      SPARC line 865 states "description: Receipt content stored for reprints".
+      SPARC line 866 states "enforcement: Receipt table stores plain text + HTML".
+      SPARC line 867 states "tracking: printedAt, reprintCount, lastReprintAt".
+      
+      observed_flows.yaml lines 245-249: "Receipt API exists, frontend doesn't call it".
+      frontend/src/components/Checkout.tsx: No POST /receipts/:transactionId/generate call.
+      
+      Receipt records never created. Receipt.printedAt and reprintCount never populated.
+    severity: HIGH
+  
+  - invariant_id: "invariants.price_override_authorization (lines 812-820)"
+    evidence: |
+      SPARC line 813 states "description: Price overrides require manager/admin PIN authentication".
+      SPARC line 814 states "enforcement: PriceOverrideService validates PIN + role".
+      
+      observed_flows.yaml lines 290-309: "ManagerOverride modal appears" but "HOW? Not visible in UI".
+      observed_flows.yaml line 350: "Component exists but not wired into POS flow".
+      
+      Backend enforcement correct. Frontend has no mechanism to trigger workflow.
+      Invariant unenforceable in practice from POS terminal.
+    severity: MEDIUM
+  
+  - invariant_id: "non_functional.reliability.error_handling (lines 916-926)"
+    evidence: |
+      SPARC line 924 states "Graceful shutdown on termination signals".
+      SPARC line 925 states "issue: unhandledRejection does NOT terminate process (potential memory leak)".
+      
+      backend/src/main.ts setupGlobalErrorHandlers():
+      process.on('unhandledRejection', (reason, promise) => {
+        logger.error('Unhandled Rejection', { reason, promise });
+        // Does not call process.exit(1)
+      });
+      
+      Process continues running after unhandled promise rejections.
+    severity: MEDIUM
+
+risks:
+  
+  - description: "Admin panel displays mock data"
+    direct_consequence: |
+      Managers cannot manage products, users, inventory, or view reports.
+      Backend APIs functional but frontend not connected.
+      Operations require API knowledge (Postman, Swagger docs).
+    severity: HIGH
+  
+  - description: "Receipt generation not integrated"
+    direct_consequence: |
+      Customers do not receive receipts.
+      No proof of purchase.
+      Receipt.printedAt and reprintCount never tracked.
+    severity: HIGH
+  
+  - description: "Tax calculation hardcoded at 7%"
+    direct_consequence: |
+      Multi-location deployments with different tax rates calculate incorrect totals.
+      Tax compliance violations in jurisdictions with rates != 7%.
+      Each location requires separate frontend build.
+    severity: HIGH
+  
+  - description: "Webhook signature verification not implemented"
+    direct_consequence: |
+      Unauthenticated webhooks from Uber Eats and DoorDash accepted.
+      Malicious actors can inject fake orders.
+      Inventory manipulation possible.
+    severity: HIGH
+  
+  - description: "PostgreSQL single point of failure"
+    direct_consequence: |
+      Database failure causes complete system outage.
+      No automatic failover.
+      Manual intervention required for recovery.
+    severity: HIGH
+  
+  - description: "Unhandled promise rejections do not terminate process"
+    direct_consequence: |
+      Memory leaks accumulate.
+      Process runs in degraded state.
+      No automatic restart.
+    severity: MEDIUM
+  
+  - description: "No backup restore testing"
+    direct_consequence: |
+      Backup integrity unverified.
+      Backup corruption discovered during emergency.
+      RPO/RTO targets unverified.
+    severity: MEDIUM
+  
+  - description: "Database not encrypted at rest"
+    direct_consequence: |
+      Customer PII and payment data stored unencrypted.
+      Data breach risk if database files compromised.
+      PCI DSS compliance gap.
+    severity: MEDIUM
+  
+  - description: "No offline mode visibility"
+    direct_consequence: |
+      Cashiers cannot determine if transactions queued or synced.
+      Offline mode functionality unverified.
+      Network outage handling unclear.
+    severity: MEDIUM
+  
+  - description: "In-memory cache not shared across instances"
+    direct_consequence: |
+      Horizontal scaling requires manual configuration.
+      Cache inconsistency across instances.
+      Rate limits not enforced across instances.
+    severity: MEDIUM
+
+release_blockers:
+  
+  - sparc_reference: "workflows.receipt_generation (lines 663-680)"
+    blocking_reason: |
+      Receipt generation workflow defined in SPARC but not executed.
+      Frontend does not call receipt API after transaction completion.
+      Customers do not receive receipts.
+  
+  - sparc_reference: "invariants.tax_calculation (lines 839-845)"
+    blocking_reason: |
+      Tax calculation invariant violated.
+      Frontend hardcodes 7% instead of fetching Location.taxRate.
+      Multi-location deployments calculate incorrect tax.
+  
+  - sparc_reference: "workflows.delivery_platform_webhook_processing (lines 708-729)"
+    blocking_reason: |
+      Webhook signature verification not implemented for Uber Eats and DoorDash.
+      Security gap allows unauthenticated webhook injection.
+      SPARC line 728 explicitly notes security_gap.
+  
+  - sparc_reference: "non_functional.availability.single_point_of_failure (lines 953-976)"
+    blocking_reason: |
+      PostgreSQL has no automatic failover.
+      Database failure causes complete system outage.
+      SPARC line 965 identifies as single_point_of_failure.
+  
+  - sparc_reference: "domains.reporting_and_analytics (lines 438-461), domains.product_catalog (lines 109-160)"
+    blocking_reason: |
+      Admin panel displays mock data.
+      Backend APIs implemented but frontend not connected.
+      Managers cannot perform operations defined in SPARC domains.
+
+# ==============================================================================
+# END OF COMPLIANCE REPORT
+# ==============================================================================
+

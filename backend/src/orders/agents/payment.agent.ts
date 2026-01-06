@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
+import { BusinessMetricsService } from '../../monitoring/business-metrics.service';
 import Stripe from 'stripe';
 
 export interface PaymentResult {
@@ -24,7 +25,10 @@ export class PaymentAgent {
   private readonly logger = new Logger(PaymentAgent.name);
   private stripe: Stripe | null = null;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private businessMetrics: BusinessMetricsService,
+  ) {
     this.initializeStripe();
   }
 
@@ -47,9 +51,7 @@ export class PaymentAgent {
         maxNetworkRetries: 3,
         typescript: true,
       });
-      this.logger.log(
-        'Stripe client initialized successfully with API version 2025-12-15.clover',
-      );
+      this.logger.log('Stripe client initialized successfully with API version 2025-12-15.clover');
     } catch (error) {
       this.logger.error('Failed to initialize Stripe client', error);
       throw error;
@@ -69,6 +71,15 @@ export class PaymentAgent {
     // For cash, immediately mark as captured
     if (method === 'cash') {
       this.logger.log(`Cash payment authorized: ${paymentId} for $${amount}`);
+
+      // Track successful cash payment
+      this.businessMetrics.trackPaymentSuccess({
+        method: 'cash',
+        amount,
+        processorId: 'cash',
+        duration: 0,
+      });
+
       return {
         paymentId,
         method,
@@ -79,13 +90,14 @@ export class PaymentAgent {
 
     // Card payment requires Stripe
     if (!this.stripe) {
-      const error =
-        'STRIPE_SECRET_KEY environment variable is required for card payments';
+      const error = 'STRIPE_SECRET_KEY environment variable is required for card payments';
       this.logger.error(error);
       throw new Error(error);
     }
 
     try {
+      const startTime = Date.now();
+
       // Create Payment Intent for card payment
       // Using manual capture for authorization flow (capture happens later)
       const paymentIntent = await this.stripe.paymentIntents.create({
@@ -100,9 +112,19 @@ export class PaymentAgent {
         description: `POS Transaction ${paymentId}`,
       });
 
+      const duration = Date.now() - startTime;
+
       this.logger.log(
         `Payment authorized: ${paymentId}, Stripe PI: ${paymentIntent.id}, Amount: $${amount}`,
       );
+
+      // Track successful card authorization
+      this.businessMetrics.trackPaymentSuccess({
+        method: 'card',
+        amount,
+        processorId: paymentIntent.id,
+        duration,
+      });
 
       return {
         paymentId,
@@ -112,14 +134,18 @@ export class PaymentAgent {
         processorId: paymentIntent.id,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Payment authorization failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error(`Payment authorization failed: ${errorMessage}`, errorStack);
+
+      // Track payment failure
+      this.businessMetrics.trackPaymentFailure({
+        method,
+        amount,
+        reason: errorMessage,
+        processorId: 'stripe',
+      });
 
       // Handle specific Stripe errors (check both instanceof and type property for testing)
       if (
@@ -135,9 +161,7 @@ export class PaymentAgent {
           method,
           amount,
           status: 'failed',
-          errorMessage: this.getStripeErrorMessage(
-            error as Stripe.errors.StripeError,
-          ),
+          errorMessage: this.getStripeErrorMessage(error as Stripe.errors.StripeError),
         };
       }
 
@@ -150,9 +174,7 @@ export class PaymentAgent {
    */
   async capture(paymentId: string, processorId?: string): Promise<void> {
     if (!processorId) {
-      this.logger.warn(
-        `No processor ID for payment ${paymentId}, assuming cash`,
-      );
+      this.logger.warn(`No processor ID for payment ${paymentId}, assuming cash`);
       return;
     }
 
@@ -162,8 +184,7 @@ export class PaymentAgent {
 
     try {
       // Capture the payment intent
-      const paymentIntent =
-        await this.stripe.paymentIntents.capture(processorId);
+      const paymentIntent = await this.stripe.paymentIntents.capture(processorId);
 
       this.logger.log(
         `Payment captured: ${paymentId}, Stripe PI: ${processorId}, ` +
@@ -174,12 +195,9 @@ export class PaymentAgent {
       // Note: In Stripe API 2025-12-15.clover, charges are not automatically included
       // We need to expand them or retrieve them separately
       try {
-        const expandedPaymentIntent = await this.stripe.paymentIntents.retrieve(
-          processorId,
-          {
-            expand: ['latest_charge.payment_method_details'],
-          },
-        );
+        const expandedPaymentIntent = await this.stripe.paymentIntents.retrieve(processorId, {
+          expand: ['latest_charge.payment_method_details'],
+        });
 
         // Access the latest charge
         const latestCharge = expandedPaymentIntent.latest_charge;
@@ -189,8 +207,7 @@ export class PaymentAgent {
           typeof latestCharge === 'object' &&
           'payment_method_details' in latestCharge
         ) {
-          const paymentMethodDetails = (latestCharge as any)
-            .payment_method_details;
+          const paymentMethodDetails = (latestCharge as any).payment_method_details;
 
           if (paymentMethodDetails?.card) {
             await this.prisma.payment.updateMany({
@@ -214,8 +231,7 @@ export class PaymentAgent {
         );
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(`Payment capture failed: ${errorMessage}`, errorStack);
@@ -228,9 +244,7 @@ export class PaymentAgent {
    */
   async void(payment: PaymentResult): Promise<void> {
     if (payment.method === 'cash') {
-      this.logger.log(
-        `Cash payment void requested: ${payment.paymentId} (no action needed)`,
-      );
+      this.logger.log(`Cash payment void requested: ${payment.paymentId} (no action needed)`);
       return;
     }
 
@@ -239,9 +253,7 @@ export class PaymentAgent {
     }
 
     if (!payment.processorId) {
-      this.logger.warn(
-        `No processor ID for payment ${payment.paymentId}, cannot void`,
-      );
+      this.logger.warn(`No processor ID for payment ${payment.paymentId}, cannot void`);
       return;
     }
 
@@ -249,9 +261,7 @@ export class PaymentAgent {
       if (payment.status === 'authorized') {
         // Cancel uncaptured payment intent
         await this.stripe.paymentIntents.cancel(payment.processorId);
-        this.logger.log(
-          `Payment canceled: ${payment.paymentId}, PI: ${payment.processorId}`,
-        );
+        this.logger.log(`Payment canceled: ${payment.paymentId}, PI: ${payment.processorId}`);
       } else if (payment.status === 'captured') {
         // Refund captured payment
         const refund = await this.stripe.refunds.create({
@@ -264,21 +274,15 @@ export class PaymentAgent {
         );
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Payment void/refund failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error(`Payment void/refund failed: ${errorMessage}`, errorStack);
 
       // Don't throw on void failures - log and continue
       // This prevents compensation failures from blocking order cancellation
       if (error instanceof Stripe.errors.StripeError) {
-        this.logger.error(
-          `Stripe error details: ${this.getStripeErrorMessage(error)}`,
-        );
+        this.logger.error(`Stripe error details: ${this.getStripeErrorMessage(error)}`);
       }
     }
   }
@@ -315,8 +319,7 @@ export class PaymentAgent {
 
       return refund;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(`Refund failed: ${errorMessage}`, errorStack);
@@ -349,10 +352,7 @@ export class PaymentAgent {
   /**
    * Create payment record in database
    */
-  async createPaymentRecord(
-    transactionId: string,
-    payment: PaymentResult,
-  ): Promise<void> {
+  async createPaymentRecord(transactionId: string, payment: PaymentResult): Promise<void> {
     await this.prisma.payment.create({
       data: {
         transactionId,

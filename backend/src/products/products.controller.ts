@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -20,11 +10,7 @@ import {
   ApiSecurity,
 } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
-import {
-  CreateProductDto,
-  UpdateProductDto,
-  SearchProductDto,
-} from './dto/product.dto';
+import { CreateProductDto, UpdateProductDto, SearchProductDto } from './dto/product.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('products')
@@ -98,10 +84,7 @@ export class ProductsController {
     description: 'Unauthorized',
   })
   findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.productsService.findAll(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 50,
-    );
+    return this.productsService.findAll(page ? parseInt(page) : 1, limit ? parseInt(limit) : 50);
   }
 
   /**
@@ -111,8 +94,7 @@ export class ProductsController {
   @Get('search')
   @ApiOperation({
     summary: 'Search products',
-    description:
-      'Search products by name, SKU, or description with optional category filter.',
+    description: 'Search products by name, SKU, or description with optional category filter.',
   })
   @ApiQuery({
     name: 'query',
@@ -154,8 +136,7 @@ export class ProductsController {
   @Get('ai-search')
   @ApiOperation({
     summary: 'AI-powered semantic search',
-    description:
-      'Search products using natural language queries powered by AI embeddings.',
+    description: 'Search products using natural language queries powered by AI embeddings.',
   })
   @ApiQuery({
     name: 'query',
@@ -180,10 +161,7 @@ export class ProductsController {
     description: 'Unauthorized',
   })
   aiSearch(@Query('query') query: string, @Query('limit') limit?: string) {
-    return this.productsService.searchWithAI(
-      query,
-      limit ? parseInt(limit) : 20,
-    );
+    return this.productsService.searchWithAI(query, limit ? parseInt(limit) : 20);
   }
 
   /**
@@ -245,14 +223,8 @@ export class ProductsController {
     status: 401,
     description: 'Unauthorized',
   })
-  findByCategory(
-    @Param('category') category: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.productsService.findByCategory(
-      category,
-      limit ? parseInt(limit) : 50,
-    );
+  findByCategory(@Param('category') category: string, @Query('limit') limit?: string) {
+    return this.productsService.findByCategory(category, limit ? parseInt(limit) : 50);
   }
 
   /**
@@ -363,8 +335,7 @@ export class ProductsController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Delete product',
-    description:
-      'Remove a product from the catalog. This action cannot be undone.',
+    description: 'Remove a product from the catalog. This action cannot be undone.',
   })
   @ApiParam({
     name: 'id',

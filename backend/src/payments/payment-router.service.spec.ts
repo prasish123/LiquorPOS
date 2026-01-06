@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PaymentRouterService, PaymentProcessor } from './payment-router.service';
+import {
+  PaymentRouterService,
+  PaymentProcessor,
+  PaymentRoutingRequest,
+} from './payment-router.service';
 import { PaymentAgent } from '../orders/agents/payment.agent';
 import { OfflinePaymentAgent } from '../orders/agents/offline-payment.agent';
 import { NetworkStatusService } from '../common/network-status.service';
@@ -15,43 +19,38 @@ describe('PaymentRouterService', () => {
   let paxAgent: jest.Mocked<PaxTerminalAgent>;
 
   beforeEach(async () => {
+    const mockPaymentAgent = {
+      authorize: jest.fn(),
+    };
+
+    const mockOfflinePaymentAgent = {
+      authorizeOffline: jest.fn(),
+      canProcessOffline: jest.fn(),
+      getConfig: jest.fn(),
+    };
+
+    const mockNetworkStatus = {
+      isOnline: jest.fn(),
+      isStripeAvailable: jest.fn(),
+    };
+
+    const mockTerminalManager = {
+      getTerminal: jest.fn(),
+      getTerminalHealth: jest.fn(),
+    };
+
+    const mockPaxAgent = {
+      processTransaction: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentRouterService,
-        {
-          provide: PaymentAgent,
-          useValue: {
-            authorize: jest.fn(),
-          },
-        },
-        {
-          provide: OfflinePaymentAgent,
-          useValue: {
-            authorizeOffline: jest.fn(),
-            canProcessOffline: jest.fn(),
-            getConfig: jest.fn(),
-          },
-        },
-        {
-          provide: NetworkStatusService,
-          useValue: {
-            isOnline: jest.fn(),
-            isStripeAvailable: jest.fn(),
-          },
-        },
-        {
-          provide: TerminalManagerService,
-          useValue: {
-            getTerminal: jest.fn(),
-            getTerminalHealth: jest.fn(),
-          },
-        },
-        {
-          provide: PaxTerminalAgent,
-          useValue: {
-            processTransaction: jest.fn(),
-          },
-        },
+        { provide: PaymentAgent, useValue: mockPaymentAgent },
+        { provide: OfflinePaymentAgent, useValue: mockOfflinePaymentAgent },
+        { provide: NetworkStatusService, useValue: mockNetworkStatus },
+        { provide: TerminalManagerService, useValue: mockTerminalManager },
+        { provide: PaxTerminalAgent, useValue: mockPaxAgent },
       ],
     }).compile();
 
@@ -63,206 +62,359 @@ describe('PaymentRouterService', () => {
     paxAgent = module.get(PaxTerminalAgent);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  describe('routePayment - Cash', () => {
+  describe('routePayment - Cash Payments', () => {
     it('should route cash payment to Stripe when online', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 50.0,
+        method: 'cash',
+        locationId: 'loc-1',
+      };
+
       networkStatus.isOnline.mockReturnValue(true);
       paymentAgent.authorize.mockResolvedValue({
-        paymentId: 'pay-123',
+        paymentId: 'pay-1',
         method: 'cash',
         amount: 50.0,
         status: 'captured',
       });
 
-      const result = await service.routePayment({
-        amount: 50.0,
+      const result = await service.routePayment(request);
+
+      expect(result).toEqual({
+        paymentId: 'pay-1',
+        processor: PaymentProcessor.STRIPE,
         method: 'cash',
-        locationId: 'loc-001',
+        amount: 50.0,
+        status: 'captured',
+        processorId: undefined,
+        cardType: undefined,
+        last4: undefined,
+        errorMessage: undefined,
       });
 
-      expect(result.processor).toBe(PaymentProcessor.STRIPE);
-      expect(result.status).toBe('captured');
       expect(paymentAgent.authorize).toHaveBeenCalledWith(50.0, 'cash', undefined);
     });
 
-    it('should route cash payment to offline when offline', async () => {
+    it('should route cash payment to offline when network unavailable', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 30.0,
+        method: 'cash',
+        locationId: 'loc-1',
+      };
+
       networkStatus.isOnline.mockReturnValue(false);
       offlinePaymentAgent.authorizeOffline.mockResolvedValue({
-        paymentId: 'pay-123',
+        paymentId: 'pay-offline-1',
         method: 'cash',
-        amount: 50.0,
+        amount: 30.0,
         status: 'captured',
         offlineMode: true,
-        requiresOnlineCapture: false,
       });
 
-      const result = await service.routePayment({
-        amount: 50.0,
-        method: 'cash',
-        locationId: 'loc-001',
-      });
+      const result = await service.routePayment(request);
 
       expect(result.processor).toBe(PaymentProcessor.OFFLINE);
-      expect(result.status).toBe('captured');
+      expect(result.method).toBe('cash');
+      expect(result.amount).toBe(30.0);
+      expect(offlinePaymentAgent.authorizeOffline).toHaveBeenCalled();
     });
   });
 
-  describe('routePayment - Card with PAX', () => {
+  describe('routePayment - Card Payments', () => {
     it('should route card payment to PAX when terminal available', async () => {
-      networkStatus.isStripeAvailable.mockReturnValue(true);
-      terminalManager.getTerminal.mockReturnValue({
-        id: 'term-001',
-        name: 'Counter 1',
-        type: 'pax',
-        locationId: 'loc-001',
-        enabled: true,
-        ipAddress: '192.168.1.100',
-        port: 10009,
-      });
-      terminalManager.getTerminalHealth.mockReturnValue({
-        terminalId: 'term-001',
-        type: 'pax',
-        online: true,
-        healthy: true,
-        lastCheck: new Date(),
-      });
-      paxAgent.processTransaction.mockResolvedValue({
-        success: true,
-        transactionId: 'txn-123',
-        referenceNumber: 'ref-123',
-        amount: 100.0,
-        cardType: 'Visa',
-        last4: '4242',
-        authCode: '123456',
-        responseCode: '000000',
-        responseMessage: 'APPROVED',
-        timestamp: new Date(),
-        terminalId: 'term-001',
-      });
-
-      const result = await service.routePayment({
+      const request: PaymentRoutingRequest = {
         amount: 100.0,
         method: 'card',
-        locationId: 'loc-001',
-        terminalId: 'term-001',
+        locationId: 'loc-1',
+        terminalId: 'term-1',
+      };
+
+      terminalManager.getTerminal.mockReturnValue({
+        id: 'term-1',
+        type: 'pax',
+        enabled: true,
+        locationId: 'loc-1',
+      } as any);
+
+      terminalManager.getTerminalHealth.mockReturnValue({
+        online: true,
+        healthy: true,
+      } as any);
+
+      paxAgent.processTransaction.mockResolvedValue({
+        success: true,
+        transactionId: 'pax-txn-1',
+        amount: 100.0,
+        referenceNumber: 'REF-123',
+        cardType: 'Visa',
+        last4: '4242',
+        authCode: 'AUTH-456',
+        responseCode: '00',
+        responseMessage: 'Approved',
+        terminalId: 'term-1',
       });
 
-      expect(result.processor).toBe(PaymentProcessor.PAX);
-      expect(result.status).toBe('captured');
-      expect(result.cardType).toBe('Visa');
-      expect(result.last4).toBe('4242');
-      expect(paxAgent.processTransaction).toHaveBeenCalledWith('term-001', {
+      const result = await service.routePayment(request);
+
+      expect(result).toEqual({
+        paymentId: 'pax-txn-1',
+        processor: PaymentProcessor.PAX,
+        method: 'card',
+        amount: 100.0,
+        status: 'captured',
+        processorId: 'REF-123',
+        cardType: 'Visa',
+        last4: '4242',
+        metadata: {
+          authCode: 'AUTH-456',
+          responseCode: '00',
+          terminalId: 'term-1',
+        },
+      });
+
+      expect(paxAgent.processTransaction).toHaveBeenCalledWith('term-1', {
         amount: 100.0,
         transactionType: 'sale',
         metadata: undefined,
       });
     });
 
-    it('should fallback to Stripe when PAX terminal unavailable', async () => {
-      networkStatus.isStripeAvailable.mockReturnValue(true);
-      terminalManager.getTerminal.mockReturnValue(undefined);
-      paymentAgent.authorize.mockResolvedValue({
-        paymentId: 'pay-123',
+    it('should route card payment to Stripe when no PAX terminal', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 75.0,
         method: 'card',
-        amount: 100.0,
+        locationId: 'loc-1',
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-2',
+        method: 'card',
+        amount: 75.0,
         status: 'authorized',
-        processorId: 'pi_123',
+        processorId: 'pi_test_123',
       });
 
-      const result = await service.routePayment({
-        amount: 100.0,
-        method: 'card',
-        locationId: 'loc-001',
-        terminalId: 'term-001',
-      });
+      const result = await service.routePayment(request);
 
       expect(result.processor).toBe(PaymentProcessor.STRIPE);
-      expect(paymentAgent.authorize).toHaveBeenCalled();
+      expect(result.method).toBe('card');
+      expect(result.amount).toBe(75.0);
+      expect(result.status).toBe('authorized');
+      expect(paymentAgent.authorize).toHaveBeenCalledWith(75.0, 'card', undefined);
+    });
+
+    it('should route card payment to offline when Stripe unavailable', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 50.0,
+        method: 'card',
+        locationId: 'loc-1',
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(false);
+      offlinePaymentAgent.authorizeOffline.mockResolvedValue({
+        paymentId: 'pay-offline-2',
+        method: 'card',
+        amount: 50.0,
+        status: 'authorized',
+        offlineMode: true,
+        requiresOnlineCapture: true,
+      });
+
+      const result = await service.routePayment(request);
+
+      expect(result.processor).toBe(PaymentProcessor.OFFLINE);
+      expect(result.requiresOnlineCapture).toBe(true);
+      expect(offlinePaymentAgent.authorizeOffline).toHaveBeenCalled();
     });
   });
 
   describe('routePayment - Preferred Processor', () => {
     it('should use preferred processor when available', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        preferredProcessor: PaymentProcessor.STRIPE,
+      };
+
       networkStatus.isStripeAvailable.mockReturnValue(true);
       paymentAgent.authorize.mockResolvedValue({
-        paymentId: 'pay-123',
+        paymentId: 'pay-3',
         method: 'card',
-        amount: 75.0,
+        amount: 100.0,
         status: 'authorized',
-        processorId: 'pi_123',
       });
 
-      const result = await service.routePayment({
-        amount: 75.0,
-        method: 'card',
-        locationId: 'loc-001',
-        preferredProcessor: PaymentProcessor.STRIPE,
-      });
+      const result = await service.routePayment(request);
 
       expect(result.processor).toBe(PaymentProcessor.STRIPE);
+      expect(paymentAgent.authorize).toHaveBeenCalled();
     });
 
     it('should fallback when preferred processor unavailable', async () => {
-      networkStatus.isStripeAvailable.mockReturnValue(false);
-      offlinePaymentAgent.canProcessOffline.mockResolvedValue({
-        allowed: true,
-      });
-      offlinePaymentAgent.authorizeOffline.mockResolvedValue({
-        paymentId: 'pay-123',
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
         method: 'card',
-        amount: 75.0,
-        status: 'offline_pending',
+        locationId: 'loc-1',
+        preferredProcessor: PaymentProcessor.PAX,
+        terminalId: 'term-1',
+      };
+
+      // PAX terminal not available
+      terminalManager.getTerminal.mockReturnValue(null);
+
+      // Fallback to Stripe
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-4',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
+      });
+
+      const result = await service.routePayment(request);
+
+      expect(result.processor).toBe(PaymentProcessor.STRIPE);
+    });
+  });
+
+  describe('routePayment - Error Handling', () => {
+    it('should fallback to offline when primary processor fails', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockRejectedValue(new Error('Stripe API error'));
+
+      offlinePaymentAgent.authorizeOffline.mockResolvedValue({
+        paymentId: 'pay-offline-3',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
         offlineMode: true,
         requiresOnlineCapture: true,
       });
 
-      const result = await service.routePayment({
-        amount: 75.0,
+      const result = await service.routePayment(request);
+
+      expect(result.processor).toBe(PaymentProcessor.OFFLINE);
+      expect(result.requiresOnlineCapture).toBe(true);
+      expect(offlinePaymentAgent.authorizeOffline).toHaveBeenCalled();
+    });
+
+    it('should throw error when all processors fail', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
         method: 'card',
-        locationId: 'loc-001',
-        preferredProcessor: PaymentProcessor.STRIPE,
+        locationId: 'loc-1',
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockRejectedValue(new Error('Stripe failed'));
+      offlinePaymentAgent.authorizeOffline.mockRejectedValue(new Error('Offline failed'));
+
+      await expect(service.routePayment(request)).rejects.toThrow('Offline failed');
+    });
+
+    it('should throw error when PAX transaction fails', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        terminalId: 'term-1',
+      };
+
+      terminalManager.getTerminal.mockReturnValue({
+        id: 'term-1',
+        type: 'pax',
+        enabled: true,
+      } as any);
+
+      terminalManager.getTerminalHealth.mockReturnValue({
+        online: true,
+        healthy: true,
+      } as any);
+
+      paxAgent.processTransaction.mockResolvedValue({
+        success: false,
+        responseCode: '05',
+        responseMessage: 'Card declined',
+      } as any);
+
+      offlinePaymentAgent.authorizeOffline.mockResolvedValue({
+        paymentId: 'pay-offline-4',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
+        offlineMode: true,
       });
 
+      const result = await service.routePayment(request);
+
+      // Should fallback to offline
       expect(result.processor).toBe(PaymentProcessor.OFFLINE);
     });
   });
 
   describe('getAvailableProcessors', () => {
     it('should return all available processors', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        terminalId: 'term-1',
+      };
+
       networkStatus.isStripeAvailable.mockReturnValue(true);
+
       terminalManager.getTerminal.mockReturnValue({
-        id: 'term-001',
-        name: 'Counter 1',
+        id: 'term-1',
         type: 'pax',
-        locationId: 'loc-001',
         enabled: true,
-        ipAddress: '192.168.1.100',
-        port: 10009,
-      });
+      } as any);
+
       terminalManager.getTerminalHealth.mockReturnValue({
-        terminalId: 'term-001',
-        type: 'pax',
         online: true,
         healthy: true,
-        lastCheck: new Date(),
-      });
+      } as any);
+
       offlinePaymentAgent.canProcessOffline.mockResolvedValue({
         allowed: true,
+        reason: 'Within limits',
       });
 
-      const processors = await service.getAvailableProcessors({
-        amount: 50.0,
-        method: 'card',
-        locationId: 'loc-001',
-        terminalId: 'term-001',
-      });
+      const processors = await service.getAvailableProcessors(request);
 
       expect(processors).toContain(PaymentProcessor.STRIPE);
       expect(processors).toContain(PaymentProcessor.PAX);
       expect(processors).toContain(PaymentProcessor.OFFLINE);
+    });
+
+    it('should return only offline when network unavailable', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 50.0,
+        method: 'cash',
+        locationId: 'loc-1',
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(false);
+
+      offlinePaymentAgent.canProcessOffline.mockResolvedValue({
+        allowed: true,
+        reason: 'Within limits',
+      });
+
+      const processors = await service.getAvailableProcessors(request);
+
+      expect(processors).toEqual([PaymentProcessor.OFFLINE]);
     });
   });
 
@@ -270,22 +422,165 @@ describe('PaymentRouterService', () => {
     it('should return health status for all processors', async () => {
       networkStatus.isStripeAvailable.mockReturnValue(true);
       networkStatus.isOnline.mockReturnValue(true);
+
       offlinePaymentAgent.getConfig.mockReturnValue({
         enabled: true,
         maxTransactionAmount: 500,
         maxDailyTotal: 5000,
-        requireManagerApproval: false,
-        allowedPaymentMethods: ['cash', 'card'],
-      });
+      } as any);
 
       const health = await service.getProcessorHealth();
 
-      expect(health[PaymentProcessor.STRIPE]).toBeDefined();
-      expect(health[PaymentProcessor.STRIPE].available).toBe(true);
-      expect(health[PaymentProcessor.PAX]).toBeDefined();
-      expect(health[PaymentProcessor.OFFLINE]).toBeDefined();
-      expect(health[PaymentProcessor.OFFLINE].available).toBe(true);
+      expect(health[PaymentProcessor.STRIPE]).toEqual({
+        available: true,
+        lastCheck: expect.any(Date),
+        details: {
+          online: true,
+        },
+      });
+
+      expect(health[PaymentProcessor.OFFLINE]).toEqual({
+        available: true,
+        lastCheck: expect.any(Date),
+        details: {
+          enabled: true,
+          maxTransactionAmount: 500,
+          maxDailyTotal: 5000,
+        },
+      });
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle missing terminal ID for PAX', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        // No terminalId provided
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-5',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
+      });
+
+      const result = await service.routePayment(request);
+
+      // Should route to Stripe since no terminal ID
+      expect(result.processor).toBe(PaymentProcessor.STRIPE);
+    });
+
+    it('should handle disabled PAX terminal', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        terminalId: 'term-1',
+      };
+
+      terminalManager.getTerminal.mockReturnValue({
+        id: 'term-1',
+        type: 'pax',
+        enabled: false, // Disabled
+      } as any);
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-6',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
+      });
+
+      const result = await service.routePayment(request);
+
+      // Should route to Stripe since terminal disabled
+      expect(result.processor).toBe(PaymentProcessor.STRIPE);
+    });
+
+    it('should handle unhealthy PAX terminal', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        terminalId: 'term-1',
+      };
+
+      terminalManager.getTerminal.mockReturnValue({
+        id: 'term-1',
+        type: 'pax',
+        enabled: true,
+      } as any);
+
+      terminalManager.getTerminalHealth.mockReturnValue({
+        online: false, // Unhealthy
+        healthy: false,
+      } as any);
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-7',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
+      });
+
+      const result = await service.routePayment(request);
+
+      // Should route to Stripe since terminal unhealthy
+      expect(result.processor).toBe(PaymentProcessor.STRIPE);
+    });
+
+    it('should handle split payment method', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'split',
+        locationId: 'loc-1',
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-8',
+        method: 'split',
+        amount: 100.0,
+        status: 'authorized',
+      });
+
+      const result = await service.routePayment(request);
+
+      expect(result.processor).toBe(PaymentProcessor.STRIPE);
+      expect(result.method).toBe('split');
+    });
+
+    it('should pass metadata to processors', async () => {
+      const request: PaymentRoutingRequest = {
+        amount: 100.0,
+        method: 'card',
+        locationId: 'loc-1',
+        metadata: {
+          employeeId: 'emp-1',
+          customerId: 'cust-1',
+        },
+      };
+
+      networkStatus.isStripeAvailable.mockReturnValue(true);
+      paymentAgent.authorize.mockResolvedValue({
+        paymentId: 'pay-9',
+        method: 'card',
+        amount: 100.0,
+        status: 'authorized',
+      });
+
+      await service.routePayment(request);
+
+      expect(paymentAgent.authorize).toHaveBeenCalledWith(100.0, 'card', {
+        employeeId: 'emp-1',
+        customerId: 'cust-1',
+      });
     });
   });
 });
-

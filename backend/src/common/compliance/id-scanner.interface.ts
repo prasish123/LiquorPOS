@@ -1,9 +1,9 @@
 /**
  * ID Scanner Hardware Integration Interface
- * 
+ *
  * This module provides interfaces and adapters for integrating with
  * various ID scanning hardware and software solutions.
- * 
+ *
  * Supported Devices:
  * - IDScan.net devices
  * - Tokenworks scanners
@@ -127,7 +127,7 @@ export class MockIDScanner implements IIDScanner {
     }
 
     // Simulate scanning delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Return mock data
     const mockData: ScannedIDData = {
@@ -220,7 +220,7 @@ export class IDScanNetScanner implements IIDScanner {
     }
 
     this.config = config;
-    
+
     // Test connection
     try {
       // In production, this would make an actual API call
@@ -245,7 +245,9 @@ export class IDScanNetScanner implements IIDScanner {
     // 3. Parse response
     // 4. Return structured data
 
-    throw new Error('IDScan.net integration not yet implemented - use MockIDScanner for development');
+    throw new Error(
+      'IDScan.net integration not yet implemented - use MockIDScanner for development',
+    );
   }
 
   async validate(data: ScannedIDData): Promise<IDScanResult> {
@@ -295,7 +297,9 @@ export class PDF417Scanner implements IIDScanner {
     // 3. Extract fields according to spec
     // 4. Return structured data
 
-    throw new Error('PDF417 scanner integration not yet implemented - use MockIDScanner for development');
+    throw new Error(
+      'PDF417 scanner integration not yet implemented - use MockIDScanner for development',
+    );
   }
 
   async validate(data: ScannedIDData): Promise<IDScanResult> {
@@ -384,4 +388,3 @@ export class IDScannerService {
     }
   }
 }
-

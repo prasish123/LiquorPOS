@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { performance } from 'perf_hooks';
@@ -28,8 +22,7 @@ export class PerformanceInterceptor implements NestInterceptor {
     const response = context.switchToHttp().getResponse();
 
     const { method, url, user, headers } = request;
-    const correlationId =
-      headers['x-correlation-id'] || headers['x-request-id'];
+    const correlationId = headers['x-correlation-id'] || headers['x-request-id'];
 
     // Start Sentry transaction
     const transaction = this.sentry.startTransaction(
@@ -87,17 +80,14 @@ export class PerformanceInterceptor implements NestInterceptor {
 
           // Log slow requests
           if (duration > 3000) {
-            this.logger.warn(
-              `Slow request: ${method} ${url} took ${Math.round(duration)}ms`,
-              {
-                method,
-                url,
-                duration: Math.round(duration),
-                statusCode,
-                userId: user?.sub || user?.id,
-                correlationId,
-              },
-            );
+            this.logger.warn(`Slow request: ${method} ${url} took ${Math.round(duration)}ms`, {
+              method,
+              url,
+              duration: Math.round(duration),
+              statusCode,
+              userId: user?.sub || user?.id,
+              correlationId,
+            });
           }
         },
         error: (error) => {

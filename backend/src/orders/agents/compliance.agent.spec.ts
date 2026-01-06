@@ -142,9 +142,7 @@ describe('ComplianceAgent', () => {
         dateOfBirth,
       });
 
-      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(ForbiddenException);
       await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(
         'Customer must be at least 21 years old',
       );
@@ -187,9 +185,7 @@ describe('ComplianceAgent', () => {
         dateOfBirth,
       });
 
-      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(ForbiddenException);
     });
 
     it('should handle customer not found', async () => {
@@ -248,9 +244,7 @@ describe('ComplianceAgent', () => {
           ageRestricted: true, // Second item is age-restricted
         });
 
-      await expect(agent.verifyAge(multipleItems)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(agent.verifyAge(multipleItems)).rejects.toThrow(ForbiddenException);
     });
 
     it('should handle mixed age-restricted and non-restricted items', async () => {
@@ -304,9 +298,7 @@ describe('ComplianceAgent', () => {
         dateOfBirth,
       });
 
-      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(ForbiddenException);
 
       jest.useRealTimers();
     });
@@ -387,9 +379,7 @@ describe('ComplianceAgent', () => {
 
     it('should handle database errors gracefully', async () => {
       mockEncryptionService.encrypt.mockReturnValue('encrypted-data');
-      mockPrismaService.auditLog.create.mockRejectedValue(
-        new Error('Database error'),
-      );
+      mockPrismaService.auditLog.create.mockRejectedValue(new Error('Database error'));
 
       await expect(
         agent.logComplianceEvent('txn-005', 'cust-001', true, 'emp-001'),
@@ -462,9 +452,7 @@ describe('ComplianceAgent', () => {
       });
 
       // Verify age (should fail)
-      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(ForbiddenException);
 
       // Log failed compliance event
       mockEncryptionService.encrypt.mockReturnValue('encrypted-data');
@@ -573,9 +561,7 @@ describe('ComplianceAgent', () => {
         dateOfBirth,
       });
 
-      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(agent.verifyAge(items, 'cust-001', true)).rejects.toThrow(ForbiddenException);
     });
   });
 });

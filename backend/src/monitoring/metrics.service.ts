@@ -29,11 +29,7 @@ export class MetricsService {
   /**
    * Increment a counter
    */
-  incrementCounter(
-    name: string,
-    value = 1,
-    labels?: Record<string, string>,
-  ): void {
+  incrementCounter(name: string, value = 1, labels?: Record<string, string>): void {
     const key = this.getKey(name, labels);
     const existing = this.counters.get(key);
 
@@ -55,11 +51,7 @@ export class MetricsService {
   /**
    * Increment a gauge
    */
-  incrementGauge(
-    name: string,
-    value = 1,
-    labels?: Record<string, string>,
-  ): void {
+  incrementGauge(name: string, value = 1, labels?: Record<string, string>): void {
     const key = this.getKey(name, labels);
     const existing = this.gauges.get(key);
 
@@ -73,11 +65,7 @@ export class MetricsService {
   /**
    * Decrement a gauge
    */
-  decrementGauge(
-    name: string,
-    value = 1,
-    labels?: Record<string, string>,
-  ): void {
+  decrementGauge(name: string, value = 1, labels?: Record<string, string>): void {
     const key = this.getKey(name, labels);
     const existing = this.gauges.get(key);
 
@@ -91,11 +79,7 @@ export class MetricsService {
   /**
    * Record a histogram value
    */
-  recordHistogram(
-    name: string,
-    value: number,
-    labels?: Record<string, string>,
-  ): void {
+  recordHistogram(name: string, value: number, labels?: Record<string, string>): void {
     const key = this.getKey(name, labels);
     const existing = this.histograms.get(key);
 

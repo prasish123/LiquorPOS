@@ -29,12 +29,10 @@ describe('Order Validation (e2e)', () => {
     await app.init();
 
     // Get auth token for protected endpoints
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({
-        username: 'admin',
-        password: 'admin123',
-      });
+    const loginResponse = await request(app.getHttpServer()).post('/auth/login').send({
+      username: 'admin',
+      password: 'admin123',
+    });
 
     authToken = loginResponse.body.access_token;
   });
@@ -524,9 +522,7 @@ describe('Order Validation (e2e)', () => {
           .send(invalidOrder)
           .expect(400)
           .expect((res) => {
-            expect(res.body.message).toContain(
-              'Age verified must be a boolean',
-            );
+            expect(res.body.message).toContain('Age verified must be a boolean');
           });
       });
 
@@ -558,9 +554,7 @@ describe('Order Validation (e2e)', () => {
           .send(invalidOrder)
           .expect(400)
           .expect((res) => {
-            expect(res.body.message).toContain(
-              'must not exceed 100 characters',
-            );
+            expect(res.body.message).toContain('must not exceed 100 characters');
           });
       });
     });

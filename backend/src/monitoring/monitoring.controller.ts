@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { PerformanceMonitoringService } from './performance-monitoring.service';
 import { MetricsService } from './metrics.service';
 import { SentryService } from './sentry.service';
+import { BusinessMetricsService } from './business-metrics.service';
 
 @ApiTags('monitoring')
 @Controller('monitoring')
@@ -11,6 +12,7 @@ export class MonitoringController {
     private readonly performanceMonitoring: PerformanceMonitoringService,
     private readonly metrics: MetricsService,
     private readonly sentry: SentryService,
+    private readonly businessMetrics: BusinessMetricsService,
   ) {}
 
   @Get('performance')
@@ -86,5 +88,15 @@ export class MonitoringController {
         },
       },
     };
+  }
+
+  @Get('business')
+  @ApiOperation({ summary: 'Get business metrics summary' })
+  @ApiResponse({
+    status: 200,
+    description: 'Business metrics retrieved successfully',
+  })
+  getBusinessMetrics() {
+    return this.businessMetrics.getMetricsSummary();
   }
 }

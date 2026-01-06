@@ -36,11 +36,7 @@ export {
   toAppException,
 } from './app-exception';
 
-export type {
-  ErrorResponse,
-  ValidationError,
-  AppExceptionOptions,
-} from './app-exception';
+export type { ErrorResponse, ValidationError, AppExceptionOptions } from './app-exception';
 
 // Exception filter
 export { AppExceptionFilter } from '../filters/app-exception.filter';

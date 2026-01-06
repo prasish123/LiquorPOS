@@ -13,9 +13,7 @@ describe('Monitoring Services', () => {
       providers: [PerformanceMonitoringService, MetricsService, SentryService],
     }).compile();
 
-    performanceMonitoring = module.get<PerformanceMonitoringService>(
-      PerformanceMonitoringService,
-    );
+    performanceMonitoring = module.get<PerformanceMonitoringService>(PerformanceMonitoringService);
     metrics = module.get<MetricsService>(MetricsService);
     sentry = module.get<SentryService>(SentryService);
 
@@ -220,9 +218,7 @@ describe('Monitoring Services', () => {
       });
 
       const prometheus = metrics.getPrometheusMetrics();
-      expect(prometheus).toContain(
-        'http_requests_total{method="GET",status="200"} 1',
-      );
+      expect(prometheus).toContain('http_requests_total{method="GET",status="200"} 1');
     });
   });
 

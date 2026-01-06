@@ -51,8 +51,7 @@ describe('PostgreSQL Migration Verification', () => {
       const databaseUrl = process.env.DATABASE_URL;
       expect(databaseUrl).toBeDefined();
       expect(
-        databaseUrl?.startsWith('postgresql://') ||
-          databaseUrl?.startsWith('postgres://'),
+        databaseUrl?.startsWith('postgresql://') || databaseUrl?.startsWith('postgres://'),
       ).toBe(true);
     });
   });
@@ -375,10 +374,7 @@ describe('PostgreSQL Migration Verification', () => {
   describe('Connection Pooling', () => {
     it('should reuse connections from pool', async () => {
       // Make multiple queries in sequence
-      const queries = Array.from(
-        { length: 10 },
-        () => prismaService.$queryRaw`SELECT 1 as value`,
-      );
+      const queries = Array.from({ length: 10 }, () => prismaService.$queryRaw`SELECT 1 as value`);
 
       const startTime = Date.now();
       await Promise.all(queries);
@@ -425,9 +421,7 @@ describe('PostgreSQL Migration Verification', () => {
     });
 
     it('should have proper indexes', async () => {
-      const indexes = await prismaService.$queryRaw<
-        { tablename: string; indexname: string }[]
-      >`
+      const indexes = await prismaService.$queryRaw<{ tablename: string; indexname: string }[]>`
         SELECT 
           tablename,
           indexname
@@ -439,15 +433,9 @@ describe('PostgreSQL Migration Verification', () => {
       const indexNames = indexes.map((i) => i.indexname);
 
       // Check for critical indexes
-      expect(
-        indexNames.some((name) => name.includes('Transaction_locationId')),
-      ).toBe(true);
-      expect(
-        indexNames.some((name) => name.includes('Transaction_createdAt')),
-      ).toBe(true);
-      expect(indexNames.some((name) => name.includes('Product_sku'))).toBe(
-        true,
-      );
+      expect(indexNames.some((name) => name.includes('Transaction_locationId'))).toBe(true);
+      expect(indexNames.some((name) => name.includes('Transaction_createdAt'))).toBe(true);
+      expect(indexNames.some((name) => name.includes('Product_sku'))).toBe(true);
     });
   });
 });

@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  HealthIndicator,
-  HealthIndicatorResult,
-  HealthCheckError,
-} from '@nestjs/terminus';
+import { HealthIndicator, HealthIndicatorResult, HealthCheckError } from '@nestjs/terminus';
 import { ConexxusHttpClient } from '../integrations/conexxus/conexxus-http.client';
 
 /**
@@ -19,9 +15,7 @@ export class ConexxusHealthIndicator extends HealthIndicator {
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     try {
       // Check if Conexxus is configured (optional integration)
-      const isConfigured = !!(
-        process.env.CONEXXUS_API_URL && process.env.CONEXXUS_API_KEY
-      );
+      const isConfigured = !!(process.env.CONEXXUS_API_URL && process.env.CONEXXUS_API_KEY);
 
       if (!isConfigured) {
         // Return healthy status for optional integration that's not configured
@@ -35,9 +29,7 @@ export class ConexxusHealthIndicator extends HealthIndicator {
 
       const result = this.getStatus(key, isHealthy, {
         status: isHealthy ? 'up' : 'down',
-        message: isHealthy
-          ? 'Conexxus API is reachable'
-          : 'Conexxus API is not responding',
+        message: isHealthy ? 'Conexxus API is reachable' : 'Conexxus API is not responding',
       });
 
       if (isHealthy) {
@@ -46,8 +38,7 @@ export class ConexxusHealthIndicator extends HealthIndicator {
 
       throw new HealthCheckError('Conexxus health check failed', result);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const result = this.getStatus(key, false, {
         status: 'down',
         message: `Conexxus API check failed: ${errorMessage}`,

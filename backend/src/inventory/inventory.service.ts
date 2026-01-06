@@ -1,15 +1,7 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma.service';
-import {
-  CreateInventoryDto,
-  UpdateInventoryDto,
-  AdjustInventoryDto,
-} from './dto/inventory.dto';
+import { CreateInventoryDto, UpdateInventoryDto, AdjustInventoryDto } from './dto/inventory.dto';
 
 @Injectable()
 export class InventoryService {
@@ -33,9 +25,7 @@ export class InventoryService {
     });
 
     if (existing) {
-      throw new BadRequestException(
-        'Inventory record already exists for this product/location',
-      );
+      throw new BadRequestException('Inventory record already exists for this product/location');
     }
 
     const inventory = await this.prisma.inventory.create({
@@ -163,9 +153,7 @@ export class InventoryService {
     const newQuantity = inventory.quantity + dto.adjustment;
 
     if (newQuantity < 0) {
-      throw new BadRequestException(
-        'Adjustment would result in negative inventory',
-      );
+      throw new BadRequestException('Adjustment would result in negative inventory');
     }
 
     const updated = await this.prisma.inventory.update({
@@ -234,8 +222,7 @@ export class InventoryService {
 
     // Filter for items where quantity <= reorderPoint
     const lowStock = inventory.filter(
-      (item) =>
-        item.reorderPoint !== null && item.quantity <= item.reorderPoint,
+      (item) => item.reorderPoint !== null && item.quantity <= item.reorderPoint,
     );
 
     return lowStock;

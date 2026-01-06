@@ -1,9 +1,9 @@
 /**
  * State-Specific Alcohol Regulations
- * 
+ *
  * This module contains comprehensive alcohol compliance rules for different US states.
  * Regulations are based on current state laws as of 2026.
- * 
+ *
  * Sources:
  * - State Alcohol Beverage Control (ABC) agencies
  * - National Institute on Alcohol Abuse and Alcoholism (NIAAA)
@@ -84,7 +84,7 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
     taxRates: {
       beer: 0.48, // per gallon
       wine: 2.25, // per gallon
-      spirits: 6.50, // per gallon
+      spirits: 6.5, // per gallon
     },
     licenseRequirements: {
       retailLicense: 'Series 2-APS (Alcoholic Beverages Package Store)',
@@ -104,12 +104,7 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
     stateCode: 'CA',
     minimumAge: 21,
     requiresIdScan: false,
-    acceptableIdTypes: [
-      'drivers_license',
-      'state_id',
-      'passport',
-      'military_id',
-    ],
+    acceptableIdTypes: ['drivers_license', 'state_id', 'passport', 'military_id'],
     saleHours: {
       monday: { start: '06:00', end: '02:00' }, // Until 2 AM next day
       tuesday: { start: '06:00', end: '02:00' },
@@ -126,9 +121,9 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
       holidayRestrictions: [],
     },
     taxRates: {
-      beer: 0.20,
-      wine: 0.20,
-      spirits: 3.30,
+      beer: 0.2,
+      wine: 0.2,
+      spirits: 3.3,
     },
     licenseRequirements: {
       retailLicense: 'Type 20 (Off-Sale Beer and Wine) or Type 21 (Off-Sale General)',
@@ -164,22 +159,19 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
       sunday: { start: '10:00', end: '24:00' }, // Beer/wine only before noon
     },
     restrictions: {
-      beerWine: [
-        'Can be sold in grocery stores',
-        'Sunday sales after 10 AM (beer/wine)',
-      ],
+      beerWine: ['Can be sold in grocery stores', 'Sunday sales after 10 AM (beer/wine)'],
       spirits: [
         'Must be sold in licensed liquor stores',
         'No Sunday sales',
-        'No sales on Thanksgiving, Christmas, New Year\'s Day',
+        "No sales on Thanksgiving, Christmas, New Year's Day",
       ],
       sundaySales: false, // For spirits
-      holidayRestrictions: ['Thanksgiving', 'Christmas', 'New Year\'s Day'],
+      holidayRestrictions: ['Thanksgiving', 'Christmas', "New Year's Day"],
     },
     taxRates: {
-      beer: 0.20,
-      wine: 0.20,
-      spirits: 2.40,
+      beer: 0.2,
+      wine: 0.2,
+      spirits: 2.4,
     },
     licenseRequirements: {
       retailLicense: 'Package Store Permit (P)',
@@ -199,12 +191,7 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
     stateCode: 'NY',
     minimumAge: 21,
     requiresIdScan: true, // Required in NYC
-    acceptableIdTypes: [
-      'drivers_license',
-      'state_id',
-      'passport',
-      'military_id',
-    ],
+    acceptableIdTypes: ['drivers_license', 'state_id', 'passport', 'military_id'],
     saleHours: {
       monday: { start: '08:00', end: '24:00' },
       tuesday: { start: '08:00', end: '24:00' },
@@ -216,16 +203,13 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
     },
     restrictions: {
       beerWine: ['Can be sold in grocery stores', 'Sunday restrictions apply'],
-      spirits: [
-        'Must be sold in licensed liquor stores',
-        'No sales on Christmas Day',
-      ],
+      spirits: ['Must be sold in licensed liquor stores', 'No sales on Christmas Day'],
       sundaySales: true, // But with time restrictions
       holidayRestrictions: ['Christmas Day'],
     },
     taxRates: {
       beer: 0.14,
-      wine: 0.30,
+      wine: 0.3,
       spirits: 6.44,
     },
     licenseRequirements: {
@@ -246,12 +230,7 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
     stateCode: 'PA',
     minimumAge: 21,
     requiresIdScan: false,
-    acceptableIdTypes: [
-      'drivers_license',
-      'state_id',
-      'passport',
-      'military_id',
-    ],
+    acceptableIdTypes: ['drivers_license', 'state_id', 'passport', 'military_id'],
     saleHours: {
       monday: { start: '07:00', end: '02:00' },
       tuesday: { start: '07:00', end: '02:00' },
@@ -275,7 +254,7 @@ export const STATE_REGULATIONS: Record<string, StateRegulation> = {
     },
     taxRates: {
       beer: 0.08,
-      wine: 0.00, // No state excise tax on wine
+      wine: 0.0, // No state excise tax on wine
       spirits: 7.24, // Highest in the nation
     },
     licenseRequirements: {
@@ -316,7 +295,7 @@ export function isSaleAllowedNow(
   const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
 
   const hours = regulation.saleHours[dayOfWeek];
-  
+
   // Check if current time is within allowed hours
   if (currentTime < hours.start || currentTime > hours.end) {
     return {
@@ -334,8 +313,11 @@ export function isSaleAllowedNow(
   }
 
   // Check holiday restrictions
-  const today = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-  if (regulation.restrictions.holidayRestrictions.some(holiday => today.includes(holiday))) {
+  const today = now.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+  });
+  if (regulation.restrictions.holidayRestrictions.some((holiday) => today.includes(holiday))) {
     return {
       allowed: false,
       reason: 'Sales not allowed on this holiday',
@@ -351,7 +333,7 @@ export function isSaleAllowedNow(
 export function isValidIdType(stateCode: string, idType: string): boolean {
   const regulation = getStateRegulation(stateCode);
   if (!regulation) return false;
-  
+
   return regulation.acceptableIdTypes.includes(idType);
 }
 
@@ -361,4 +343,3 @@ export function isValidIdType(stateCode: string, idType: string): boolean {
 export function getSupportedStates(): string[] {
   return Object.keys(STATE_REGULATIONS);
 }
-

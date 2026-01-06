@@ -33,9 +33,7 @@ export class AuditService {
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
         result,
-        details: details
-          ? this.encryption.encrypt(JSON.stringify(details))
-          : null,
+        details: details ? this.encryption.encrypt(JSON.stringify(details)) : null,
       },
     });
   }
@@ -114,9 +112,7 @@ export class AuditService {
       data: {
         eventType: 'IDEMPOTENCY_CHECK',
         userId: context.userId,
-        action: isDuplicate
-          ? 'duplicate_request_blocked'
-          : 'new_request_processed',
+        action: isDuplicate ? 'duplicate_request_blocked' : 'new_request_processed',
         resourceId: transactionId,
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
@@ -159,8 +155,7 @@ export class AuditService {
             originalPrice,
             overridePrice,
             discount: originalPrice - overridePrice,
-            discountPercent:
-              ((originalPrice - overridePrice) / originalPrice) * 100,
+            discountPercent: ((originalPrice - overridePrice) / originalPrice) * 100,
             reason,
             managerId,
             cashierId,

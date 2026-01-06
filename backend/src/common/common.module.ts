@@ -14,11 +14,6 @@ import { PrismaService } from '../prisma.service';
     OfflineQueueService,
     PrismaService,
   ],
-  exports: [
-    ConfigValidationService,
-    EncryptionService,
-    NetworkStatusService,
-    OfflineQueueService,
-  ],
+  exports: [ConfigValidationService, EncryptionService, NetworkStatusService, OfflineQueueService],
 })
 export class CommonModule {}

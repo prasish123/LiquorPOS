@@ -1,12 +1,37 @@
-import React from 'react';
 import './Solution.css';
+import { useEffect, useRef, useState } from 'react';
 
-const Solution: React.FC = () => {
+const Solution = () => {
+  const [visibleCards, setVisibleCards] = useState<boolean[]>([false, false, false]);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCards([true, true, true]);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = sectionRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, []);
+
   return (
-    <section className="solution">
+    <section className="solution" ref={sectionRef}>
       <h2 className="section-title">LiquorPOS solves this</h2>
       <div className="solution-grid">
-        <div className="solution-card">
+        <div className={`solution-card ${visibleCards[0] ? 'visible' : ''}`}>
           <div className="solution-icon">✓</div>
           <h3>Works 100% offline</h3>
           <ul className="solution-list">
@@ -19,7 +44,7 @@ const Solution: React.FC = () => {
           </div>
         </div>
         
-        <div className="solution-card">
+        <div className={`solution-card ${visibleCards[1] ? 'visible' : ''}`}>
           <div className="solution-icon">🔒</div>
           <h3>Compliance built-in</h3>
           <ul className="solution-list">
@@ -32,7 +57,7 @@ const Solution: React.FC = () => {
           </div>
         </div>
         
-        <div className="solution-card">
+        <div className={`solution-card ${visibleCards[2] ? 'visible' : ''}`}>
           <div className="solution-icon">📊</div>
           <h3>Purchase intelligence</h3>
           <ul className="solution-list">

@@ -75,7 +75,7 @@ describe('State Regulations', () => {
     it('should accept passport in all states', () => {
       const states = getSupportedStates();
 
-      states.forEach(state => {
+      states.forEach((state) => {
         const result = isValidIdType(state, 'passport');
         expect(result).toBe(true);
       });
@@ -112,7 +112,7 @@ describe('State Regulations', () => {
     it('should have correct minimum age for all states', () => {
       const states = getSupportedStates();
 
-      states.forEach(state => {
+      states.forEach((state) => {
         const regulation = getStateRegulation(state);
         expect(regulation?.minimumAge).toBe(21);
       });
@@ -160,4 +160,3 @@ describe('State Regulations', () => {
     });
   });
 });
-

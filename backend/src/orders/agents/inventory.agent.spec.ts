@@ -124,9 +124,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(BadRequestException);
       await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
         'Product with SKU WINE-001 not found',
       );
@@ -168,9 +166,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(BadRequestException);
       await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
         'Insufficient inventory',
       );
@@ -230,12 +226,8 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        'No inventory found',
-      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(BadRequestException);
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow('No inventory found');
     });
 
     it('should throw error when row lock fails', async () => {
@@ -266,9 +258,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(BadRequestException);
       await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
         'Failed to lock inventory',
       );
@@ -303,8 +293,7 @@ describe('InventoryAgent', () => {
           const txContext = {
             product: {
               findUnique: jest.fn().mockImplementation(({ where }) => {
-                const product =
-                  mockProducts[where.sku as keyof typeof mockProducts];
+                const product = mockProducts[where.sku as keyof typeof mockProducts];
                 return Promise.resolve(product);
               }),
             },
@@ -314,13 +303,9 @@ describe('InventoryAgent', () => {
             $queryRaw: jest.fn().mockImplementation(() => {
               callCount++;
               if (callCount === 1) {
-                return Promise.resolve([
-                  { id: 'inv-001', quantity: 10, reserved: 0 },
-                ]);
+                return Promise.resolve([{ id: 'inv-001', quantity: 10, reserved: 0 }]);
               }
-              return Promise.resolve([
-                { id: 'inv-002', quantity: 20, reserved: 0 },
-              ]);
+              return Promise.resolve([{ id: 'inv-002', quantity: 20, reserved: 0 }]);
             }),
           };
 
@@ -621,9 +606,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(
-        agent.commit(reservation, locationId),
-      ).resolves.not.toThrow();
+      await expect(agent.commit(reservation, locationId)).resolves.not.toThrow();
     });
   });
 
@@ -651,21 +634,15 @@ describe('InventoryAgent', () => {
     it('should handle transaction timeout', async () => {
       const items: OrderItemDto[] = [{ sku: 'WINE-001', quantity: 2 }];
 
-      mockPrismaService.$transaction.mockRejectedValue(
-        new Error('Transaction timeout'),
-      );
+      mockPrismaService.$transaction.mockRejectedValue(new Error('Transaction timeout'));
 
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        'Transaction timeout',
-      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow('Transaction timeout');
     });
 
     it('should handle database connection errors', async () => {
       const items: OrderItemDto[] = [{ sku: 'WINE-001', quantity: 2 }];
 
-      mockPrismaService.$transaction.mockRejectedValue(
-        new Error('Database connection failed'),
-      );
+      mockPrismaService.$transaction.mockRejectedValue(new Error('Database connection failed'));
 
       await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
         'Database connection failed',
@@ -805,9 +782,7 @@ describe('InventoryAgent', () => {
               },
               $queryRaw: jest
                 .fn()
-                .mockResolvedValue([
-                  { id: 'inv-001', quantity: 10, reserved: 0 },
-                ]),
+                .mockResolvedValue([{ id: 'inv-001', quantity: 10, reserved: 0 }]),
             };
             await callback(txContext as never);
           },
@@ -834,9 +809,7 @@ describe('InventoryAgent', () => {
       expect(result1.items[0].quantity).toBe(6);
 
       // Second attempt should fail - only 4 available but requesting 6
-      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(BadRequestException);
     });
 
     it('should handle release with empty reservation', async () => {
@@ -856,9 +829,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(
-        agent.release(emptyReservation, locationId),
-      ).resolves.not.toThrow();
+      await expect(agent.release(emptyReservation, locationId)).resolves.not.toThrow();
     });
 
     it('should handle commit with empty reservation', async () => {
@@ -878,9 +849,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(
-        agent.commit(emptyReservation, locationId),
-      ).resolves.not.toThrow();
+      await expect(agent.commit(emptyReservation, locationId)).resolves.not.toThrow();
     });
 
     it('should handle product lookup failure during release', async () => {
@@ -910,9 +879,7 @@ describe('InventoryAgent', () => {
         },
       );
 
-      await expect(
-        agent.release(reservation, locationId),
-      ).resolves.not.toThrow();
+      await expect(agent.release(reservation, locationId)).resolves.not.toThrow();
     });
 
     it('should handle multiple items with mixed tracking status', async () => {
@@ -952,8 +919,7 @@ describe('InventoryAgent', () => {
           const txContext = {
             product: {
               findUnique: jest.fn().mockImplementation(({ where }) => {
-                const product =
-                  mockProducts[where.sku as keyof typeof mockProducts];
+                const product = mockProducts[where.sku as keyof typeof mockProducts];
                 return Promise.resolve(product);
               }),
             },
@@ -963,13 +929,9 @@ describe('InventoryAgent', () => {
             $queryRaw: jest.fn().mockImplementation(() => {
               callCount++;
               if (callCount === 1) {
-                return Promise.resolve([
-                  { id: 'inv-001', quantity: 10, reserved: 0 },
-                ]);
+                return Promise.resolve([{ id: 'inv-001', quantity: 10, reserved: 0 }]);
               }
-              return Promise.resolve([
-                { id: 'inv-003', quantity: 20, reserved: 0 },
-              ]);
+              return Promise.resolve([{ id: 'inv-003', quantity: 20, reserved: 0 }]);
             }),
           };
 
@@ -988,9 +950,7 @@ describe('InventoryAgent', () => {
     it('should handle lock acquisition failure gracefully', async () => {
       const items: OrderItemDto[] = [{ sku: 'WINE-001', quantity: 2 }];
 
-      mockPrismaService.$transaction.mockRejectedValue(
-        new Error('Could not acquire lock'),
-      );
+      mockPrismaService.$transaction.mockRejectedValue(new Error('Could not acquire lock'));
 
       await expect(agent.checkAndReserve(locationId, items)).rejects.toThrow(
         'Could not acquire lock',
@@ -1020,11 +980,7 @@ describe('InventoryAgent', () => {
             inventory: {
               update: jest.fn().mockResolvedValue({}),
             },
-            $queryRaw: jest
-              .fn()
-              .mockResolvedValue([
-                { id: 'inv-001', quantity: 10, reserved: 0 },
-              ]),
+            $queryRaw: jest.fn().mockResolvedValue([{ id: 'inv-001', quantity: 10, reserved: 0 }]),
           };
           await callback(txContext as never);
         },

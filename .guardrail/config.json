@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "thresholds": {
+    "green": 75,
+    "yellow": 50,
+    "red": 0
+  },
+  "scoring": {
+    "code_quality": 25,
+    "testing": 25,
+    "deployment": 20,
+    "documentation": 15,
+    "prd_compliance": 15
+  },
+  "git_hook": {
+    "enabled": false,
+    "min_score": 70,
+    "block_on_fail": true
+  },
+  "notifications": {
+    "enabled": false,
+    "webhook_url": null
+  }
+}

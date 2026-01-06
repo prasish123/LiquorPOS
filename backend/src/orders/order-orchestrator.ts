@@ -2,11 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma.service';
 import { Transaction } from '@prisma/client';
-import {
-  CreateOrderDto,
-  OrderResponseDto,
-  OrderItemResponseDto,
-} from './dto/order.dto';
+import { CreateOrderDto, OrderResponseDto, OrderItemResponseDto } from './dto/order.dto';
 import { InventoryAgent, InventoryReservation } from './agents/inventory.agent';
 import { PricingAgent, PricingResult } from './agents/pricing.agent';
 import { ComplianceAgent, ComplianceResult } from './agents/compliance.agent';
@@ -15,6 +11,7 @@ import { OfflinePaymentAgent, OfflinePaymentResult } from './agents/offline-paym
 import { AuditService } from './audit.service';
 import { NetworkStatusService } from '../common/network-status.service';
 import { OfflineQueueService } from '../common/offline-queue.service';
+import { BusinessMetricsService } from '../monitoring/business-metrics.service';
 
 interface OrderContext {
   order: CreateOrderDto;
@@ -41,6 +38,7 @@ export class OrderOrchestrator {
     private auditService: AuditService,
     private networkStatus: NetworkStatusService,
     private offlineQueue: OfflineQueueService,
+    private businessMetrics: BusinessMetricsService,
   ) {
     // Register handler for offline transaction processing
     this.offlineQueue.registerHandler('transaction', (payload) =>
@@ -60,10 +58,7 @@ export class OrderOrchestrator {
 
       // Step 1: Inventory check and reservation
       this.logger.debug('Step 1: Checking and reserving inventory');
-      context.inventory = await this.inventoryAgent.checkAndReserve(
-        dto.locationId,
-        dto.items,
-      );
+      context.inventory = await this.inventoryAgent.checkAndReserve(dto.locationId, dto.items);
 
       // Step 2: Calculate pricing (or use POS provided values)
       this.logger.debug('Step 2: Determining pricing');
@@ -86,10 +81,7 @@ export class OrderOrchestrator {
           })),
         };
       } else {
-        context.pricing = await this.pricingAgent.calculate(
-          dto.items,
-          dto.locationId,
-        );
+        context.pricing = await this.pricingAgent.calculate(dto.items, dto.locationId);
       }
 
       // Step 3: Compliance check (age verification)
@@ -102,14 +94,14 @@ export class OrderOrchestrator {
 
       // Step 4: Process payment (with offline fallback)
       this.logger.debug('Step 4: Processing payment');
-      
+
       // Check if we're online and Stripe is available
       const isStripeAvailable = this.networkStatus.isStripeAvailable();
       const isOnline = this.networkStatus.isOnline();
-      
+
       if (!isStripeAvailable && dto.paymentMethod === 'card') {
         this.logger.warn('Stripe unavailable, attempting offline payment authorization');
-        
+
         // Try offline payment
         context.payment = await this.offlinePaymentAgent.authorizeOffline(
           context.pricing.total,
@@ -121,13 +113,11 @@ export class OrderOrchestrator {
           },
         );
         context.offlineMode = true;
-        
+
         if (context.payment.status === 'failed') {
-          throw new Error(
-            context.payment.errorMessage || 'Offline payment authorization failed',
-          );
+          throw new Error(context.payment.errorMessage || 'Offline payment authorization failed');
         }
-        
+
         // Queue payment capture for when we're back online
         if ('requiresOnlineCapture' in context.payment && context.payment.requiresOnlineCapture) {
           await this.offlineQueue.enqueue(
@@ -148,7 +138,7 @@ export class OrderOrchestrator {
           dto.paymentMethod,
         );
         context.offlineMode = false;
-        
+
         if (context.payment.status === 'failed') {
           throw new Error('Payment authorization failed');
         }
@@ -166,10 +156,7 @@ export class OrderOrchestrator {
       // Step 7: Capture payment (if card and not offline)
       if (dto.paymentMethod === 'card' && !context.offlineMode) {
         this.logger.debug('Step 7: Capturing payment');
-        await this.paymentAgent.capture(
-          context.payment.paymentId,
-          context.payment.processorId,
-        );
+        await this.paymentAgent.capture(context.payment.paymentId, context.payment.processorId);
       } else if (context.offlineMode) {
         this.logger.log('Skipping payment capture (offline mode - will capture when online)');
       }
@@ -180,13 +167,11 @@ export class OrderOrchestrator {
         paymentId: context.payment.paymentId,
         method: context.payment.method,
         amount: context.payment.amount,
-        status: context.payment.status === 'offline_pending' ? 'authorized' : context.payment.status,
+        status:
+          context.payment.status === 'offline_pending' ? 'authorized' : context.payment.status,
         processorId: context.payment.processorId,
       };
-      await this.paymentAgent.createPaymentRecord(
-        transaction.id,
-        paymentRecord,
-      );
+      await this.paymentAgent.createPaymentRecord(transaction.id, paymentRecord);
 
       // Step 9: Log payment processing to audit trail
       await this.auditService.logPaymentProcessing(
@@ -217,16 +202,33 @@ export class OrderOrchestrator {
       this.logger.debug('Step 11: Publishing order.created event');
       await this.publishOrderCreatedEvent(transaction);
 
+      // Step 12: Track business metrics
+      this.businessMetrics.trackOrderCompleted({
+        id: transaction.id,
+        locationId: dto.locationId,
+        channel: dto.channel || 'in-store',
+        total: context.pricing.total,
+        itemCount: dto.items.length,
+        paymentMethod: dto.paymentMethod,
+      });
+
       this.logger.log(`Order ${transaction.id} processed successfully`);
 
       // Return formatted response
       return this.formatOrderResponse(transaction, context.pricing);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(`Order processing failed: ${errorMessage}`, errorStack);
+
+      // Track order failure metrics
+      this.businessMetrics.trackOrderFailed({
+        locationId: dto.locationId,
+        channel: dto.channel || 'in-store',
+        reason: errorMessage,
+        total: context.pricing?.total || 0,
+      });
 
       // Log failed payment processing
       if (context.payment) {
@@ -247,10 +249,7 @@ export class OrderOrchestrator {
       }
 
       // Compensation (SAGA pattern)
-      await this.compensate(
-        context,
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      await this.compensate(context, error instanceof Error ? error : new Error(String(error)));
 
       throw error;
     }
@@ -318,10 +317,7 @@ export class OrderOrchestrator {
     if (context.inventory) {
       this.logger.debug('Compensating: Releasing inventory reservation');
       try {
-        await this.inventoryAgent.release(
-          context.inventory,
-          context.order.locationId,
-        );
+        await this.inventoryAgent.release(context.inventory, context.order.locationId);
       } catch (err) {
         this.logger.error('Failed to release inventory', err);
       }
@@ -336,7 +332,8 @@ export class OrderOrchestrator {
           paymentId: context.payment.paymentId,
           method: context.payment.method,
           amount: context.payment.amount,
-          status: context.payment.status === 'offline_pending' ? 'authorized' : context.payment.status,
+          status:
+            context.payment.status === 'offline_pending' ? 'authorized' : context.payment.status,
           processorId: context.payment.processorId,
         };
         await this.paymentAgent.void(paymentToVoid);
@@ -397,10 +394,7 @@ export class OrderOrchestrator {
   /**
    * Format transaction for API response
    */
-  private formatOrderResponse(
-    transaction: Transaction,
-    pricing: PricingResult,
-  ): OrderResponseDto {
+  private formatOrderResponse(transaction: Transaction, pricing: PricingResult): OrderResponseDto {
     const items: OrderItemResponseDto[] = pricing.items.map((item) => ({
       id: crypto.randomUUID(),
       ...item,
@@ -439,7 +433,7 @@ export class OrderOrchestrator {
 
     // This would handle any post-processing needed for offline transactions
     // For example, syncing with external systems when back online
-    
+
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: payload.transactionId },
       include: { items: true },

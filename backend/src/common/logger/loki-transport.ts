@@ -33,7 +33,7 @@ export class LokiTransport extends Transport {
   private maxRetries: number;
   private retryDelay: number;
   private maxQueueSize: number;
-  
+
   // Circuit breaker
   private circuitState: CircuitState = CircuitState.CLOSED;
   private failureCount: number = 0;
@@ -42,7 +42,7 @@ export class LokiTransport extends Transport {
   private failureThreshold: number = 5;
 
   constructor(options: LokiTransportOptions) {
-    super(options);
+    super({} as any); // Pass empty object - we don't use winston's transport options
 
     this.labels = options.labels || {};
     this.batching = options.batching !== false;
@@ -138,7 +138,7 @@ export class LokiTransport extends Transport {
   private async send(streams: LogEntry[], retryCount: number = 0): Promise<void> {
     try {
       await this.client.post('/loki/api/v1/push', { streams });
-      
+
       // Success - reset circuit breaker
       this.failureCount = 0;
       if (this.circuitState === CircuitState.HALF_OPEN) {
@@ -153,7 +153,7 @@ export class LokiTransport extends Transport {
   private async handleError(
     error: AxiosError,
     streams: LogEntry[],
-    retryCount: number
+    retryCount: number,
   ): Promise<void> {
     this.failureCount++;
     this.lastFailureTime = Date.now();
@@ -169,18 +169,16 @@ export class LokiTransport extends Transport {
       const delay = this.retryDelay * Math.pow(2, retryCount); // Exponential backoff
       console.warn(
         `Failed to send logs to Loki (attempt ${retryCount + 1}/${this.maxRetries}), ` +
-        `retrying in ${delay}ms: ${error.message}`
+          `retrying in ${delay}ms: ${error.message}`,
       );
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
       return this.send(streams, retryCount + 1);
     }
 
     // All retries failed
-    console.error(
-      `Failed to send logs to Loki after ${this.maxRetries} retries: ${error.message}`
-    );
-    
+    console.error(`Failed to send logs to Loki after ${this.maxRetries} retries: ${error.message}`);
+
     // Don't throw - we don't want to crash the app
     // Logs are lost, but app continues
   }
@@ -192,4 +190,3 @@ export class LokiTransport extends Transport {
     this.flush();
   }
 }
-

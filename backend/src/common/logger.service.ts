@@ -29,7 +29,7 @@ export class LoggerService implements NestLoggerService {
     const logLevel = process.env.LOG_LEVEL || 'info';
     const logDir = process.env.LOG_DIR || 'logs';
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // Load app config for observability settings
     let appConfig;
     try {
@@ -53,18 +53,16 @@ export class LoggerService implements NestLoggerService {
     const consoleFormat = winston.format.combine(
       winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
       winston.format.colorize(),
-      winston.format.printf(
-        ({ timestamp, level, message, context, correlationId, ...meta }) => {
-          let log = `${timestamp} [${level}]`;
-          if (context) log += ` [${context}]`;
-          if (correlationId) log += ` [${correlationId}]`;
-          log += ` ${message}`;
-          if (Object.keys(meta).length > 0) {
-            log += ` ${JSON.stringify(meta)}`;
-          }
-          return log;
-        },
-      ),
+      winston.format.printf(({ timestamp, level, message, context, correlationId, ...meta }) => {
+        let log = `${timestamp} [${level}]`;
+        if (context) log += ` [${context}]`;
+        if (correlationId) log += ` [${correlationId}]`;
+        log += ` ${message}`;
+        if (Object.keys(meta).length > 0) {
+          log += ` ${JSON.stringify(meta)}`;
+        }
+        return log;
+      }),
     );
 
     const transports: winston.transport[] = [];

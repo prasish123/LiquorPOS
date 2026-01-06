@@ -1,0 +1,116 @@
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+}
+
+.logo-circle {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--color-accent) 0%, #0056b3 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.logo-pos {
+  color: white;
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 1px;
+}
+
+.logo-signal {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.signal-bar {
+  width: 3px;
+  background-color: var(--color-success);
+  border-radius: 2px;
+  animation: signal 1.5s ease-in-out infinite;
+}
+
+.signal-bar:nth-child(1) {
+  height: 6px;
+  animation-delay: 0s;
+}
+
+.signal-bar:nth-child(2) {
+  height: 10px;
+  animation-delay: 0.2s;
+}
+
+.signal-bar:nth-child(3) {
+  height: 14px;
+  animation-delay: 0.4s;
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logo-name {
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  letter-spacing: -0.5px;
+}
+
+.logo-tagline {
+  font-size: 11px;
+  color: var(--color-success);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 113, 227, 0.4);
+  }
+}
+
+@keyframes signal {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Small logo variant for footer */
+.logo-small {
+  transform: scale(0.8);
+}
+
+.logo-small .logo-name {
+  font-size: 20px;
+}
+
+.logo-small .logo-tagline {
+  font-size: 10px;
+}
+

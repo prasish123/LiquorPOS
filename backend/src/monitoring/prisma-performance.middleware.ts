@@ -21,7 +21,7 @@ export class PrismaPerformanceMiddleware implements OnModuleInit {
     // Prisma 7 removed $use middleware
     // TODO: Implement performance tracking using Prisma 7's new extension system
     // See: https://www.prisma.io/docs/concepts/components/prisma-client/client-extensions
-    
+
     this.logger.warn('Prisma performance middleware disabled - $use removed in Prisma 7');
     this.logger.log('Prisma performance monitoring middleware initialized (disabled)');
   }
@@ -29,12 +29,7 @@ export class PrismaPerformanceMiddleware implements OnModuleInit {
   /**
    * Track database query performance
    */
-  private trackQuery(
-    params: any,
-    duration: number,
-    success: boolean,
-    error?: any,
-  ): void {
+  private trackQuery(params: any, duration: number, success: boolean, error?: any): void {
     const { model, action } = params;
     const query = `${model}.${action}`;
 

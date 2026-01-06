@@ -187,9 +187,7 @@ describe('LocationsService', () => {
     it('should throw NotFoundException when location does not exist', async () => {
       mockPrismaService.location.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove('loc-999')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.remove('loc-999')).rejects.toThrow(NotFoundException);
     });
   });
 });

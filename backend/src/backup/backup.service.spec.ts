@@ -73,7 +73,9 @@ describe('BackupService', () => {
     it('should initialize backup directories', async () => {
       await service.onModuleInit();
 
-      expect(fs.mkdir).toHaveBeenCalledWith('./test-backups', { recursive: true });
+      expect(fs.mkdir).toHaveBeenCalledWith('./test-backups', {
+        recursive: true,
+      });
       expect(fs.mkdir).toHaveBeenCalledWith('./test-wal', { recursive: true });
     });
 
@@ -309,4 +311,3 @@ describe('BackupService', () => {
     });
   });
 });
-

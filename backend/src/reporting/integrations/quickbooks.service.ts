@@ -162,4 +162,3 @@ export class QuickBooksService implements AccountingIntegration {
     };
   }
 }
-

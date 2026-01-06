@@ -1,0 +1,76 @@
+# Dependencies
+node_modules
+npm-debug.log
+package-lock.json
+
+# Build output
+dist
+build
+*.tsbuildinfo
+
+# Testing
+coverage
+test-results
+*.spec.ts
+*.test.ts
+test
+__tests__
+__mocks__
+
+# Environment files (CRITICAL - never copy to image)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+dev.db
+backups
+wal_archive
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Misc
+.editorconfig
+.eslintrc*
+.prettierrc*
+tsconfig*.json
+jest.config.js
+

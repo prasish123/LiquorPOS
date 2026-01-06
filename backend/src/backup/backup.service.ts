@@ -49,18 +49,9 @@ export class BackupService implements OnModuleInit {
   private backupMetadata: Map<string, BackupMetadata> = new Map();
 
   constructor(private configService: ConfigService) {
-    this.backupDir = this.configService.get<string>(
-      'BACKUP_DIR',
-      './backups',
-    );
-    this.walArchiveDir = this.configService.get<string>(
-      'WAL_ARCHIVE_DIR',
-      './wal_archive',
-    );
-    this.retentionDays = this.configService.get<number>(
-      'BACKUP_RETENTION_DAYS',
-      30,
-    );
+    this.backupDir = this.configService.get<string>('BACKUP_DIR', './backups');
+    this.walArchiveDir = this.configService.get<string>('WAL_ARCHIVE_DIR', './wal_archive');
+    this.retentionDays = this.configService.get<number>('BACKUP_RETENTION_DAYS', 30);
     this.enabled = this.configService.get<boolean>('BACKUP_ENABLED', true);
     this.s3Enabled = this.configService.get<boolean>('BACKUP_S3_ENABLED', false);
     this.s3Bucket = this.configService.get<string>('BACKUP_S3_BUCKET', '');
@@ -152,9 +143,7 @@ export class BackupService implements OnModuleInit {
       checksum: '',
       status: 'in_progress',
       location: filepath,
-      retentionUntil: new Date(
-        Date.now() + this.retentionDays * 24 * 60 * 60 * 1000,
-      ),
+      retentionUntil: new Date(Date.now() + this.retentionDays * 24 * 60 * 60 * 1000),
     };
 
     this.backupMetadata.set(backupId, metadata);
@@ -180,10 +169,7 @@ export class BackupService implements OnModuleInit {
 
       // Calculate checksum
       const fileBuffer = await fs.readFile(compressedPath);
-      const checksum = crypto
-        .createHash('sha256')
-        .update(fileBuffer)
-        .digest('hex');
+      const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
       // Update metadata
       const stats = await fs.stat(compressedPath);
@@ -218,7 +204,9 @@ export class BackupService implements OnModuleInit {
   async restoreFromBackup(options: RestoreOptions): Promise<void> {
     const { backupId, targetTime, validateOnly, skipWalReplay } = options;
 
-    this.logger.log(`Starting restore: backupId=${backupId}, targetTime=${targetTime}, validateOnly=${validateOnly}`);
+    this.logger.log(
+      `Starting restore: backupId=${backupId}, targetTime=${targetTime}, validateOnly=${validateOnly}`,
+    );
 
     const metadata = this.backupMetadata.get(backupId);
     if (!metadata) {
@@ -250,7 +238,9 @@ export class BackupService implements OnModuleInit {
 
       // Drop and recreate database (in production, use a different approach)
       this.logger.log('Dropping existing database...');
-      await execAsync(`psql "${databaseUrl}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`);
+      await execAsync(
+        `psql "${databaseUrl}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"`,
+      );
 
       // Restore from backup
       this.logger.log('Restoring from backup...');
@@ -314,15 +304,10 @@ export class BackupService implements OnModuleInit {
 
       // Verify checksum
       const fileBuffer = await fs.readFile(metadata.location);
-      const checksum = crypto
-        .createHash('sha256')
-        .update(fileBuffer)
-        .digest('hex');
+      const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
       if (checksum !== metadata.checksum) {
-        throw new Error(
-          `Checksum mismatch: expected ${metadata.checksum}, got ${checksum}`,
-        );
+        throw new Error(`Checksum mismatch: expected ${metadata.checksum}, got ${checksum}`);
       }
 
       // Verify can decompress
@@ -350,16 +335,13 @@ export class BackupService implements OnModuleInit {
 
     return {
       totalBackups: completedBackups.length,
-      lastBackupTime: completedBackups.length > 0
-        ? completedBackups[completedBackups.length - 1].timestamp
-        : null,
-      lastBackupStatus: backups.length > 0
-        ? backups[backups.length - 1].status
-        : 'none',
+      lastBackupTime:
+        completedBackups.length > 0
+          ? completedBackups[completedBackups.length - 1].timestamp
+          : null,
+      lastBackupStatus: backups.length > 0 ? backups[backups.length - 1].status : 'none',
       totalSize: completedBackups.reduce((sum, b) => sum + b.size, 0),
-      oldestBackup: completedBackups.length > 0
-        ? completedBackups[0].timestamp
-        : null,
+      oldestBackup: completedBackups.length > 0 ? completedBackups[0].timestamp : null,
       failedBackupsLast24h,
     };
   }
@@ -431,9 +413,7 @@ export class BackupService implements OnModuleInit {
       const databaseUrl = this.getDatabaseUrl();
 
       // Check if WAL archiving is enabled
-      const { stdout } = await execAsync(
-        `psql "${databaseUrl}" -t -c "SHOW wal_level;"`,
-      );
+      const { stdout } = await execAsync(`psql "${databaseUrl}" -t -c "SHOW wal_level;"`);
 
       const walLevel = stdout.trim();
       if (walLevel !== 'replica' && walLevel !== 'logical') {
@@ -506,16 +486,13 @@ export class BackupService implements OnModuleInit {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   }
 
   /**
    * Send backup alert to monitoring system
    */
-  private async sendBackupAlert(
-    type: string,
-    error: any,
-  ): Promise<void> {
+  private async sendBackupAlert(type: string, error: any): Promise<void> {
     this.logger.error(`BACKUP ALERT: ${type}`, error);
 
     // Import MonitoringService dynamically to avoid circular dependency
@@ -528,4 +505,3 @@ export class BackupService implements OnModuleInit {
     }
   }
 }
-

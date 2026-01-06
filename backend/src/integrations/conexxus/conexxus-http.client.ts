@@ -97,10 +97,7 @@ export class ConexxusHttpClient {
     this.prisma = prisma;
 
     // Initialize circuit breaker
-    this.circuitBreaker = new CircuitBreaker(
-      'ConexxusAPI',
-      this.config.circuitBreaker,
-    );
+    this.circuitBreaker = new CircuitBreaker('ConexxusAPI', this.config.circuitBreaker);
 
     this.logger.log('Conexxus HTTP client initialized', {
       baseURL: this.config.baseURL,
@@ -155,12 +152,9 @@ export class ConexxusHttpClient {
     // Request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
-        this.logger.debug(
-          `HTTP Request: ${config.method?.toUpperCase()} ${config.url}`,
-          {
-            headers: config.headers,
-          },
-        );
+        this.logger.debug(`HTTP Request: ${config.method?.toUpperCase()} ${config.url}`, {
+          headers: config.headers,
+        });
         return config;
       },
       (error) => {
@@ -172,13 +166,10 @@ export class ConexxusHttpClient {
     // Response interceptor for logging and error handling
     this.client.interceptors.response.use(
       (response) => {
-        this.logger.debug(
-          `HTTP Response: ${response.status} ${response.config.url}`,
-          {
-            status: response.status,
-            data: response.data,
-          },
-        );
+        this.logger.debug(`HTTP Response: ${response.status} ${response.config.url}`, {
+          status: response.status,
+          data: response.data,
+        });
         return response;
       },
       (error: AxiosError) => {
@@ -198,9 +189,7 @@ export class ConexxusHttpClient {
     if (!process.env.CONEXXUS_API_URL) {
       errors.push('CONEXXUS_API_URL is not configured');
     } else if (process.env.CONEXXUS_API_URL.includes('example.com')) {
-      errors.push(
-        'CONEXXUS_API_URL points to example domain. Please configure a real API URL.',
-      );
+      errors.push('CONEXXUS_API_URL points to example domain. Please configure a real API URL.');
     } else if (
       !process.env.CONEXXUS_API_URL.startsWith('http://') &&
       !process.env.CONEXXUS_API_URL.startsWith('https://')
@@ -233,14 +222,11 @@ export class ConexxusHttpClient {
       try {
         this.logger.log('Fetching inventory items from Conexxus API');
 
-        const response = await this.client.get<
-          ConexxusResponse<ConexxusItem[]>
-        >('/api/v1/inventory/items');
+        const response =
+          await this.client.get<ConexxusResponse<ConexxusItem[]>>('/api/v1/inventory/items');
 
         if (!response.data.success) {
-          throw new Error(
-            response.data.error || 'Failed to fetch inventory items',
-          );
+          throw new Error(response.data.error || 'Failed to fetch inventory items');
         }
 
         const items = response.data.data || [];
@@ -295,17 +281,17 @@ export class ConexxusHttpClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.client.get<
-        ConexxusResponse<{ status: string }>
-      >('/api/v1/health', {
-        timeout: 5000, // Short timeout for health checks
-        'axios-retry': {
-          retries: 1, // Only retry once for health checks
-        },
-      } as AxiosRequestConfig);
+      const response = await this.client.get<ConexxusResponse<{ status: string }>>(
+        '/api/v1/health',
+        {
+          timeout: 5000, // Short timeout for health checks
+          'axios-retry': {
+            retries: 1, // Only retry once for health checks
+          },
+        } as AxiosRequestConfig,
+      );
 
-      const isHealthy =
-        response.data.success && response.data.data?.status === 'ok';
+      const isHealthy = response.data.success && response.data.data?.status === 'ok';
 
       if (isHealthy) {
         this.logger.debug('Conexxus API health check passed');
@@ -354,8 +340,7 @@ export class ConexxusHttpClient {
       }
     } catch (error) {
       const latency = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       return {
         success: false,
@@ -406,24 +391,18 @@ export class ConexxusHttpClient {
       } else if (status === 403) {
         return new Error('Conexxus API access forbidden. Check permissions.');
       } else if (status === 404) {
-        return new Error(
-          `Conexxus API endpoint not found: ${error.config?.url}`,
-        );
+        return new Error(`Conexxus API endpoint not found: ${error.config?.url}`);
       } else if (status === 429) {
         return new Error('Conexxus API rate limit exceeded. Try again later.');
       } else if (status >= 500) {
-        return new Error(
-          `Conexxus API server error (${status}). Try again later.`,
-        );
+        return new Error(`Conexxus API server error (${status}). Try again later.`);
       } else {
         const errorMessage = data?.error || data?.message || error.message;
         return new Error(`Conexxus API error (${status}): ${errorMessage}`);
       }
     } else if (error.request) {
       if (error.code === 'ECONNABORTED') {
-        return new Error(
-          `Conexxus API request timeout after ${this.config.timeout}ms`,
-        );
+        return new Error(`Conexxus API request timeout after ${this.config.timeout}ms`);
       } else if (error.code === 'ECONNREFUSED') {
         return new Error('Conexxus API connection refused. Check API URL.');
       } else if (error.code === 'ENOTFOUND') {
@@ -439,18 +418,13 @@ export class ConexxusHttpClient {
   /**
    * Log sync failure to EventLog table for audit trail
    */
-  private async logSyncFailure(
-    operation: string,
-    error: any,
-    data?: any,
-  ): Promise<void> {
+  private async logSyncFailure(operation: string, error: any, data?: any): Promise<void> {
     if (!this.prisma) {
       return; // Prisma not available, skip logging
     }
 
     try {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       await this.prisma.eventLog.create({

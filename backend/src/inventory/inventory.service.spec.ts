@@ -99,9 +99,7 @@ describe('InventoryService', () => {
         ...createDto,
       });
 
-      await expect(service.create(createDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.create(createDto)).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -149,9 +147,7 @@ describe('InventoryService', () => {
     it('should throw error when inventory not found', async () => {
       mockPrismaService.inventory.findUnique.mockResolvedValue(null);
 
-      await expect(service.reserve('prod-1', 'loc-1', 5)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.reserve('prod-1', 'loc-1', 5)).rejects.toThrow(NotFoundException);
     });
   });
 

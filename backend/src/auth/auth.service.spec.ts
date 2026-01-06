@@ -83,10 +83,7 @@ describe('AuthService', () => {
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { username: 'testuser' },
       });
-      expect(mockedBcrypt.compare).toHaveBeenCalledWith(
-        'password123',
-        '$2b$10$hashedpassword',
-      );
+      expect(mockedBcrypt.compare).toHaveBeenCalledWith('password123', '$2b$10$hashedpassword');
     });
 
     it('should return null when user is not found', async () => {
@@ -108,20 +105,15 @@ describe('AuthService', () => {
       const result = await service.validateUser('testuser', 'wrongpassword');
 
       expect(result).toBeNull();
-      expect(mockedBcrypt.compare).toHaveBeenCalledWith(
-        'wrongpassword',
-        '$2b$10$hashedpassword',
-      );
+      expect(mockedBcrypt.compare).toHaveBeenCalledWith('wrongpassword', '$2b$10$hashedpassword');
     });
 
     it('should handle database errors gracefully', async () => {
-      mockPrismaService.user.findUnique.mockRejectedValue(
-        new Error('Database connection error'),
-      );
+      mockPrismaService.user.findUnique.mockRejectedValue(new Error('Database connection error'));
 
-      await expect(
-        service.validateUser('testuser', 'password123'),
-      ).rejects.toThrow('Database connection error');
+      await expect(service.validateUser('testuser', 'password123')).rejects.toThrow(
+        'Database connection error',
+      );
     });
   });
 
@@ -270,13 +262,9 @@ describe('AuthService', () => {
         role: 'CASHIER',
         jti: 'token-jti-123',
       };
-      mockRedisService.set.mockRejectedValue(
-        new Error('Redis connection error'),
-      );
+      mockRedisService.set.mockRejectedValue(new Error('Redis connection error'));
 
-      await expect(service.revokeToken(user)).rejects.toThrow(
-        'Redis connection error',
-      );
+      await expect(service.revokeToken(user)).rejects.toThrow('Redis connection error');
     });
   });
 
@@ -287,9 +275,7 @@ describe('AuthService', () => {
       const result = await service.isTokenBlacklisted('token-jti-123');
 
       expect(result).toBe(true);
-      expect(mockRedisService.get).toHaveBeenCalledWith(
-        'blacklist:token-jti-123',
-      );
+      expect(mockRedisService.get).toHaveBeenCalledWith('blacklist:token-jti-123');
     });
 
     it('should return false when token is not blacklisted', async () => {
@@ -298,15 +284,11 @@ describe('AuthService', () => {
       const result = await service.isTokenBlacklisted('token-jti-456');
 
       expect(result).toBe(false);
-      expect(mockRedisService.get).toHaveBeenCalledWith(
-        'blacklist:token-jti-456',
-      );
+      expect(mockRedisService.get).toHaveBeenCalledWith('blacklist:token-jti-456');
     });
 
     it('should handle Redis errors gracefully', async () => {
-      mockRedisService.get.mockRejectedValue(
-        new Error('Redis connection error'),
-      );
+      mockRedisService.get.mockRejectedValue(new Error('Redis connection error'));
 
       await expect(service.isTokenBlacklisted('token-jti-123')).rejects.toThrow(
         'Redis connection error',
@@ -350,11 +332,7 @@ describe('AuthService', () => {
         jti,
       });
 
-      expect(mockRedisService.set).toHaveBeenCalledWith(
-        `blacklist:${jti}`,
-        '1',
-        8 * 60 * 60,
-      );
+      expect(mockRedisService.set).toHaveBeenCalledWith(`blacklist:${jti}`, '1', 8 * 60 * 60);
 
       // Check if token is blacklisted
       mockRedisService.get.mockResolvedValue('1');

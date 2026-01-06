@@ -36,9 +36,7 @@ describe('DeliveryPlatformTransformerService', () => {
       ],
     }).compile();
 
-    service = module.get<DeliveryPlatformTransformerService>(
-      DeliveryPlatformTransformerService,
-    );
+    service = module.get<DeliveryPlatformTransformerService>(DeliveryPlatformTransformerService);
     prismaService = module.get<PrismaService>(PrismaService);
   });
 
@@ -108,9 +106,7 @@ describe('DeliveryPlatformTransformerService', () => {
         idScanned: false,
       });
 
-      expect(result.idempotencyKey).toBe(
-        'uber_eats:evt_ubereats_123:order_ubereats_456',
-      );
+      expect(result.idempotencyKey).toBe('uber_eats:evt_ubereats_123:order_ubereats_456');
     });
 
     it('should use fallback SKU when external_data is missing', async () => {
@@ -163,9 +159,9 @@ describe('DeliveryPlatformTransformerService', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      await expect(
-        service.transformUberEatsOrder(uberEatsPayload),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.transformUberEatsOrder(uberEatsPayload)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject orders with no items', async () => {
@@ -182,9 +178,9 @@ describe('DeliveryPlatformTransformerService', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      await expect(
-        service.transformUberEatsOrder(uberEatsPayload),
-      ).rejects.toThrow('Order must contain at least one item');
+      await expect(service.transformUberEatsOrder(uberEatsPayload)).rejects.toThrow(
+        'Order must contain at least one item',
+      );
     });
 
     it('should handle missing optional payment fields', async () => {
@@ -284,9 +280,7 @@ describe('DeliveryPlatformTransformerService', () => {
         idScanned: false,
       });
 
-      expect(result.idempotencyKey).toBe(
-        'doordash:evt_doordash_123:order_doordash_456',
-      );
+      expect(result.idempotencyKey).toBe('doordash:evt_doordash_123:order_doordash_456');
     });
 
     it('should use fallback SKU when external_id is missing', async () => {
@@ -341,9 +335,9 @@ describe('DeliveryPlatformTransformerService', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      await expect(
-        service.transformDoorDashOrder(doorDashPayload),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.transformDoorDashOrder(doorDashPayload)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject orders with no items', async () => {
@@ -362,9 +356,9 @@ describe('DeliveryPlatformTransformerService', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      await expect(
-        service.transformDoorDashOrder(doorDashPayload),
-      ).rejects.toThrow('Order must contain at least one item');
+      await expect(service.transformDoorDashOrder(doorDashPayload)).rejects.toThrow(
+        'Order must contain at least one item',
+      );
     });
 
     it('should handle location mapping failure gracefully', async () => {
@@ -396,9 +390,9 @@ describe('DeliveryPlatformTransformerService', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      await expect(
-        service.transformDoorDashOrder(doorDashPayload),
-      ).rejects.toThrow('Failed to map store to location');
+      await expect(service.transformDoorDashOrder(doorDashPayload)).rejects.toThrow(
+        'Failed to map store to location',
+      );
     });
   });
 
@@ -506,21 +500,12 @@ describe('DeliveryPlatformTransformerService', () => {
         created_at: '2025-01-02T12:00:00Z',
       };
 
-      const uberEatsResult =
-        await service.transformUberEatsOrder(uberEatsPayload);
-      const doorDashResult =
-        await service.transformDoorDashOrder(doorDashPayload);
+      const uberEatsResult = await service.transformUberEatsOrder(uberEatsPayload);
+      const doorDashResult = await service.transformDoorDashOrder(doorDashPayload);
 
-      expect(uberEatsResult.idempotencyKey).toBe(
-        'uber_eats:evt_123:order_456',
-      );
-      expect(doorDashResult.idempotencyKey).toBe(
-        'doordash:evt_123:order_456',
-      );
-      expect(uberEatsResult.idempotencyKey).not.toBe(
-        doorDashResult.idempotencyKey,
-      );
+      expect(uberEatsResult.idempotencyKey).toBe('uber_eats:evt_123:order_456');
+      expect(doorDashResult.idempotencyKey).toBe('doordash:evt_123:order_456');
+      expect(uberEatsResult.idempotencyKey).not.toBe(doorDashResult.idempotencyKey);
     });
   });
 });
-

@@ -254,8 +254,7 @@ export class CreateOrderDto {
 
   // Idempotency Key - CRITICAL for preventing duplicate orders
   @ApiProperty({
-    description:
-      'Unique idempotency key to prevent duplicate orders (UUID recommended)',
+    description: 'Unique idempotency key to prevent duplicate orders (UUID recommended)',
     example: '123e4567-e89b-12d3-a456-426614174000',
     type: String,
   })

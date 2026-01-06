@@ -298,4 +298,3 @@ export class TerminalHealthResponseDto {
   })
   details?: any;
 }
-

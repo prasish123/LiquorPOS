@@ -15,12 +15,11 @@ export class RedisHealthIndicator extends HealthIndicator {
       return this.getStatus(key, true, { mode: 'connected' });
     } catch (error) {
       // Allow degraded mode - app has in-memory fallback
-      return this.getStatus(key, true, { 
-        mode: 'degraded', 
+      return this.getStatus(key, true, {
+        mode: 'degraded',
         fallback: 'in-memory cache',
-        warning: 'Redis unavailable, using fallback'
+        warning: 'Redis unavailable, using fallback',
       });
     }
   }
 }
-

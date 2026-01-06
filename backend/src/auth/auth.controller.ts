@@ -86,13 +86,9 @@ export class AuthController {
   })
   @ApiResponse({
     status: 429,
-    description:
-      'Too many login attempts - Rate limit exceeded (5 attempts/minute)',
+    description: 'Too many login attempts - Rate limit exceeded (5 attempts/minute)',
   })
-  async signIn(
-    @Body() signInDto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async signIn(@Body() signInDto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(signInDto);
 
     // Set JWT in HttpOnly cookie
@@ -114,8 +110,7 @@ export class AuthController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'User logout',
-    description:
-      'Logout the current user, revoke JWT token, and clear authentication cookie.',
+    description: 'Logout the current user, revoke JWT token, and clear authentication cookie.',
   })
   @ApiResponse({
     status: 200,

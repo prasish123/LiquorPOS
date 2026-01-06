@@ -1,11 +1,4 @@
-import {
-  IsString,
-  IsEnum,
-  IsOptional,
-  IsNumber,
-  Min,
-  IsNotEmpty,
-} from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsNumber, Min, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -226,4 +219,3 @@ export class RefundTransactionDto {
   @IsString()
   reason?: string;
 }
-

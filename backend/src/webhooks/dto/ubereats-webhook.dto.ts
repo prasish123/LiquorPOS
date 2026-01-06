@@ -216,4 +216,3 @@ export class UberEatsWebhookDto {
   @IsOptional()
   metadata?: any;
 }
-

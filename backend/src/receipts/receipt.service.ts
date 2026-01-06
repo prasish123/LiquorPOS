@@ -65,9 +65,7 @@ export class ReceiptService {
 
     // Map items with override information
     const itemsWithOverrides = transaction.items.map((item) => {
-      const override = transaction.priceOverrides.find(
-        (o) => o.itemId === item.id,
-      );
+      const override = transaction.priceOverrides.find((o) => o.itemId === item.id);
 
       return {
         name: item.name,
@@ -75,7 +73,7 @@ export class ReceiptService {
         unitPrice: item.unitPrice,
         total: item.total,
         priceOverridden: item.priceOverridden,
-        originalPrice: item.originalPrice,
+        originalPrice: item.originalPrice ?? undefined,
         managerName: override?.managerName,
       };
     });
@@ -88,17 +86,15 @@ export class ReceiptService {
       storeState: transaction.location.state,
       storeZip: transaction.location.zip,
       date: transaction.createdAt,
-      cashierName: employee
-        ? `${employee.firstName} ${employee.lastName}`
-        : 'Unknown',
+      cashierName: employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown',
       terminalId: transaction.terminalId || 'N/A',
       items: itemsWithOverrides,
       subtotal: transaction.subtotal,
       tax: transaction.tax,
       total: transaction.total,
       paymentMethod: transaction.paymentMethod,
-      cardType: transaction.payments[0]?.cardType,
-      last4: transaction.payments[0]?.last4,
+      cardType: transaction.payments[0]?.cardType ?? undefined,
+      last4: transaction.payments[0]?.last4 ?? undefined,
       ageVerified: transaction.ageVerified,
       customFooter: transaction.location.receiptFooter || 'Thank you!',
     };
@@ -140,8 +136,7 @@ export class ReceiptService {
     receipt += line + '\n';
     receipt += center(data.storeName) + '\n';
     receipt += center(data.storeAddress) + '\n';
-    receipt +=
-      center(`${data.storeCity}, ${data.storeState} ${data.storeZip}`) + '\n';
+    receipt += center(`${data.storeCity}, ${data.storeState} ${data.storeZip}`) + '\n';
     receipt += line + '\n';
     receipt += '\n';
     receipt += `Date: ${data.date.toLocaleString('en-US', {
@@ -193,7 +188,7 @@ export class ReceiptService {
     }
 
     receipt += '\n';
-    receipt += center(data.customFooter) + '\n';
+    receipt += center(data.customFooter ?? 'Thank you!') + '\n';
     receipt += line + '\n';
 
     return receipt;
@@ -363,4 +358,3 @@ export class ReceiptService {
     console.log('\n' + receiptText + '\n');
   }
 }
-

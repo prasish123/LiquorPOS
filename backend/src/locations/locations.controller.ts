@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -88,8 +79,7 @@ export class LocationsController {
   @Get('expiring-licenses')
   @ApiOperation({
     summary: 'Get locations with expiring licenses',
-    description:
-      'Retrieve locations with liquor licenses expiring within 90 days.',
+    description: 'Retrieve locations with liquor licenses expiring within 90 days.',
   })
   @ApiResponse({
     status: 200,
@@ -163,8 +153,7 @@ export class LocationsController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Update location',
-    description:
-      'Update location information including address, license, and operating hours.',
+    description: 'Update location information including address, license, and operating hours.',
   })
   @ApiParam({
     name: 'id',
@@ -189,10 +178,7 @@ export class LocationsController {
     status: 403,
     description: 'Invalid CSRF token',
   })
-  update(
-    @Param('id') id: string,
-    @Body() updateLocationDto: UpdateLocationDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateLocationDto: UpdateLocationDto) {
     return this.locationsService.update(id, updateLocationDto);
   }
 
@@ -204,8 +190,7 @@ export class LocationsController {
   @ApiSecurity('CSRF')
   @ApiOperation({
     summary: 'Delete location',
-    description:
-      'Remove a location from the system. This action cannot be undone.',
+    description: 'Remove a location from the system. This action cannot be undone.',
   })
   @ApiParam({
     name: 'id',

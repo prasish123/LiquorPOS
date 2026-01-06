@@ -166,10 +166,7 @@ describe('Order Validators', () => {
     });
 
     it('should accept valid CUIDs', () => {
-      const validCUIDs = [
-        'c1234567890123456789012345',
-        'cabcdefghijklmnopqrstuvwxy',
-      ];
+      const validCUIDs = ['c1234567890123456789012345', 'cabcdefghijklmnopqrstuvwxy'];
 
       validCUIDs.forEach((cuid) => {
         expect(validator.validate(cuid)).toBe(true);
@@ -177,11 +174,7 @@ describe('Order Validators', () => {
     });
 
     it('should accept custom ID formats', () => {
-      const validCustomIDs = [
-        'location_001',
-        'terminal-abc123',
-        'customer_12345678',
-      ];
+      const validCustomIDs = ['location_001', 'terminal-abc123', 'customer_12345678'];
 
       validCustomIDs.forEach((id) => {
         expect(validator.validate(id)).toBe(true);

@@ -1,0 +1,294 @@
+name: CI - Continuous Integration
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend Tests & Linting
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: liquor_pos_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+      
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+      
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/liquor_pos_test
+        run: npx prisma migrate deploy
+      
+      - name: Run linting
+        working-directory: backend
+        run: npm run lint
+      
+      - name: Run tests with coverage
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/liquor_pos_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret-minimum-32-characters-required
+          AUDIT_LOG_ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1jaGFycyE=
+          ALLOWED_ORIGINS: http://localhost:3000
+          NODE_ENV: test
+        run: npm run test:cov
+      
+      - name: Build application
+        working-directory: backend
+        run: npm run build
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+      
+      - name: Check test coverage threshold
+        working-directory: backend
+        run: |
+          COVERAGE=$(node -e "const cov = require('./coverage/coverage-summary.json'); console.log(cov.total.statements.pct)")
+          echo "Test coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 37" | bc -l) )); then
+            echo "❌ Coverage ($COVERAGE%) is below minimum threshold (37%)"
+            exit 1
+          fi
+          echo "✅ Coverage check passed"
+
+  # ---------------------------------------------------------------------------
+  # Frontend Tests & Linting
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      
+      - name: Run type checking
+        working-directory: frontend
+        run: npm run lint
+      
+      - name: Build application
+        working-directory: frontend
+        run: npm run build
+      
+      - name: Check build output
+        run: |
+          if [ ! -d "frontend/dist" ]; then
+            echo "❌ Build failed - dist directory not found"
+            exit 1
+          fi
+          echo "✅ Build successful"
+
+  # ---------------------------------------------------------------------------
+  # Security Audit
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Audit backend dependencies
+        working-directory: backend
+        run: |
+          npm audit --audit-level=high --production
+          if [ $? -ne 0 ]; then
+            echo "⚠️ Backend has high/critical vulnerabilities"
+            npm audit --audit-level=high --production --json > backend-audit.json
+            exit 1
+          fi
+      
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=high --production
+          if [ $? -ne 0 ]; then
+            echo "⚠️ Frontend has high/critical vulnerabilities"
+            npm audit --audit-level=high --production --json > frontend-audit.json
+            exit 1
+          fi
+      
+      - name: Upload audit results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-results
+          path: |
+            backend-audit.json
+            frontend-audit.json
+
+  # ---------------------------------------------------------------------------
+  # Docker Build Test
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: liquor-pos-backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: liquor-pos-frontend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Maintainability Check
+  # ---------------------------------------------------------------------------
+  maintainability:
+    name: Maintainability Score
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Calculate maintainability score
+        id: score
+        run: |
+          node .github/scripts/calculate-maintainability.js
+          SCORE=$(cat maintainability-score.txt)
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+      
+      - name: Comment PR with score
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const score = fs.readFileSync('maintainability-report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: score
+            });
+      
+      - name: Upload maintainability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintainability-report
+          path: maintainability-report.md
+      
+      - name: Check maintainability threshold
+        run: |
+          SCORE=${{ steps.score.outputs.score }}
+          if [ "$SCORE" -lt 70 ]; then
+            echo "❌ Maintainability score ($SCORE/100) is below threshold (70/100)"
+            exit 1
+          fi
+          echo "✅ Maintainability score: $SCORE/100"
+
+  # ---------------------------------------------------------------------------
+  # All Checks Passed
+  # ---------------------------------------------------------------------------
+  all-checks:
+    name: All CI Checks Passed
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, security, docker, maintainability]
+    
+    steps:
+      - name: Success
+        run: |
+          echo "✅ All CI checks passed!"
+          echo "✅ Backend tests passed"
+          echo "✅ Frontend build passed"
+          echo "✅ Security audit passed"
+          echo "✅ Docker builds passed"
+          echo "✅ Maintainability check passed"
+

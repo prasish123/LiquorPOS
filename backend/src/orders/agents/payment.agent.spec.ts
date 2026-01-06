@@ -92,9 +92,7 @@ describe('PaymentAgent', () => {
         status: 'requires_capture',
       };
 
-      mockStripe.paymentIntents.create.mockResolvedValue(
-        mockPaymentIntent as any,
-      );
+      mockStripe.paymentIntents.create.mockResolvedValue(mockPaymentIntent as any);
 
       const result = await paymentAgent.authorize(100.0, 'card', {
         locationId: 'loc-1',
@@ -125,10 +123,7 @@ describe('PaymentAgent', () => {
 
       // Create new instance without Stripe
       const module = await Test.createTestingModule({
-        providers: [
-          PaymentAgent,
-          { provide: PrismaService, useValue: mockPrismaService },
-        ],
+        providers: [PaymentAgent, { provide: PrismaService, useValue: mockPrismaService }],
       }).compile();
 
       const agent = module.get<PaymentAgent>(PaymentAgent);
@@ -158,10 +153,7 @@ describe('PaymentAgent', () => {
         type: 'StripeConnectionError',
         message: 'Network error',
       };
-      Object.setPrototypeOf(
-        networkError,
-        Stripe.errors.StripeConnectionError.prototype,
-      );
+      Object.setPrototypeOf(networkError, Stripe.errors.StripeConnectionError.prototype);
 
       mockStripe.paymentIntents.create.mockRejectedValue(networkError);
 
@@ -206,15 +198,11 @@ describe('PaymentAgent', () => {
         },
       };
 
-      mockStripe.paymentIntents.capture.mockResolvedValue(
-        mockCapturedIntent as any,
-      );
+      mockStripe.paymentIntents.capture.mockResolvedValue(mockCapturedIntent as any);
 
       await paymentAgent.capture('payment-123', 'pi_test_123');
 
-      expect(mockStripe.paymentIntents.capture).toHaveBeenCalledWith(
-        'pi_test_123',
-      );
+      expect(mockStripe.paymentIntents.capture).toHaveBeenCalledWith('pi_test_123');
       expect(mockPrismaService.payment.updateMany).toHaveBeenCalledWith({
         where: { processorId: 'pi_test_123' },
         data: {
@@ -231,13 +219,11 @@ describe('PaymentAgent', () => {
     });
 
     it('should throw error on capture failure', async () => {
-      mockStripe.paymentIntents.capture.mockRejectedValue(
-        new Error('Capture failed'),
-      );
+      mockStripe.paymentIntents.capture.mockRejectedValue(new Error('Capture failed'));
 
-      await expect(
-        paymentAgent.capture('payment-123', 'pi_test_123'),
-      ).rejects.toThrow('Capture failed');
+      await expect(paymentAgent.capture('payment-123', 'pi_test_123')).rejects.toThrow(
+        'Capture failed',
+      );
     });
   });
 
@@ -258,9 +244,7 @@ describe('PaymentAgent', () => {
 
       await paymentAgent.void(payment);
 
-      expect(mockStripe.paymentIntents.cancel).toHaveBeenCalledWith(
-        'pi_test_123',
-      );
+      expect(mockStripe.paymentIntents.cancel).toHaveBeenCalledWith('pi_test_123');
     });
 
     it('should refund captured payment', async () => {
@@ -295,9 +279,7 @@ describe('PaymentAgent', () => {
         processorId: 'pi_test_123',
       };
 
-      mockStripe.paymentIntents.cancel.mockRejectedValue(
-        new Error('Cancel failed'),
-      );
+      mockStripe.paymentIntents.cancel.mockRejectedValue(new Error('Cancel failed'));
 
       // Should not throw - compensation failures should be logged
       await expect(paymentAgent.void(payment)).resolves.not.toThrow();
@@ -340,9 +322,7 @@ describe('PaymentAgent', () => {
     it('should throw error on refund failure', async () => {
       mockStripe.refunds.create.mockRejectedValue(new Error('Refund failed'));
 
-      await expect(paymentAgent.refund('pi_test_123')).rejects.toThrow(
-        'Refund failed',
-      );
+      await expect(paymentAgent.refund('pi_test_123')).rejects.toThrow('Refund failed');
     });
   });
 
@@ -407,10 +387,7 @@ describe('PaymentAgent', () => {
 
       const errorCases = [
         {
-          error: createStripeError(
-            'StripeCardError',
-            Stripe.errors.StripeCardError.prototype,
-          ),
+          error: createStripeError('StripeCardError', Stripe.errors.StripeCardError.prototype),
           expectedMessage: 'Card declined',
         },
         {
@@ -428,10 +405,7 @@ describe('PaymentAgent', () => {
           expectedMessage: 'Invalid payment request',
         },
         {
-          error: createStripeError(
-            'StripeAPIError',
-            Stripe.errors.StripeAPIError.prototype,
-          ),
+          error: createStripeError('StripeAPIError', Stripe.errors.StripeAPIError.prototype),
           expectedMessage: 'temporarily unavailable',
         },
         {

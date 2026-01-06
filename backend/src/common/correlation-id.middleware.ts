@@ -11,8 +11,7 @@ import { LoggerService } from './logger.service';
 export class CorrelationIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction): void {
     // Get correlation ID from header or generate new one
-    const correlationId =
-      (req.headers['x-correlation-id'] as string) || randomUUID();
+    const correlationId = (req.headers['x-correlation-id'] as string) || randomUUID();
 
     // Set in response header for client tracking
     res.setHeader('X-Correlation-Id', correlationId);

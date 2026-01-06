@@ -1,0 +1,75 @@
+name: Maintainability Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  maintainability-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Full history for better analysis
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+      
+      - name: Run tests with coverage
+        run: |
+          cd backend
+          npm run test:cov
+      
+      - name: Check code quality
+        run: |
+          cd backend
+          npm run lint
+      
+      - name: Calculate maintainability score
+        id: score
+        run: |
+          node .github/scripts/calculate-maintainability.js
+      
+      - name: Comment PR with score
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const score = fs.readFileSync('maintainability-report.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: score
+            });
+      
+      - name: Upload maintainability report
+        uses: actions/upload-artifact@v3
+        with:
+          name: maintainability-report
+          path: maintainability-report.md
+      
+      - name: Fail if score below threshold
+        run: |
+          SCORE=$(cat maintainability-score.txt)
+          if [ "$SCORE" -lt 70 ]; then
+            echo "❌ Maintainability score ($SCORE/100) is below threshold (70/100)"
+            exit 1
+          fi
+          echo "✅ Maintainability score: $SCORE/100"
+

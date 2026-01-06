@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  Patch,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Patch, UseGuards, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
@@ -99,8 +89,7 @@ export class OrdersController {
     const user = (req as Request & { user?: { id?: string } }).user;
     const context = {
       userId: user?.id,
-      ipAddress:
-        req.ip || (req.connection as { remoteAddress?: string })?.remoteAddress,
+      ipAddress: req.ip || (req.connection as { remoteAddress?: string })?.remoteAddress,
       userAgent: req.headers['user-agent'],
     };
 
@@ -164,8 +153,7 @@ export class OrdersController {
 
       return result;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       // Log failed order creation
       await this.auditService.logOrderCreation('unknown', 'failure', context, {
         error: errorMessage,
@@ -179,8 +167,7 @@ export class OrdersController {
   @Get()
   @ApiOperation({
     summary: 'List all orders',
-    description:
-      'Retrieve a paginated list of orders with optional location filtering',
+    description: 'Retrieve a paginated list of orders with optional location filtering',
   })
   @ApiQuery({
     name: 'page',
@@ -250,10 +237,7 @@ export class OrdersController {
     status: 401,
     description: 'Unauthorized',
   })
-  getDailySummary(
-    @Query('date') date: string,
-    @Query('locationId') locationId?: string,
-  ) {
+  getDailySummary(@Query('date') date: string, @Query('locationId') locationId?: string) {
     return this.ordersService.getDailySummary(new Date(date), locationId);
   }
 

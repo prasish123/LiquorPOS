@@ -14,9 +14,7 @@ export class OpenAIService {
         apiKey: process.env.OPENAI_API_KEY,
       });
     } else {
-      this.logger.warn(
-        'OPENAI_API_KEY not set - AI search will fall back to regular search',
-      );
+      this.logger.warn('OPENAI_API_KEY not set - AI search will fall back to regular search');
     }
   }
 
@@ -33,8 +31,7 @@ export class OpenAIService {
 
       return response.data[0].embedding;
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Error generating embedding', undefined, {
         error: errorMessage,
       });

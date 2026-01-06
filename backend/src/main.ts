@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { ConfigValidationService } from './common/config-validation.service';
 import { LoggerService } from './common/logger.service';
 import { getValidatedConfig } from './config/app.config';
+import { validateEnvironment } from './common/env-validation';
 import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -18,6 +19,7 @@ async function bootstrap() {
   // CRITICAL: Validate environment variables BEFORE creating the app
   // This ensures we fail fast if configuration is invalid
   logger.log('Validating environment configuration...');
+  validateEnvironment(); // New comprehensive validation
   const configValidator = new ConfigValidationService();
   const config = configValidator.validateAndThrow();
   logger.log('Environment validation complete');
@@ -27,11 +29,15 @@ async function bootstrap() {
   try {
     const appConfig = getValidatedConfig();
     logger.log('Application configuration validated successfully');
-    logger.log(`Configuration loaded: ${JSON.stringify({
-      redis: { memoryCacheSize: appConfig.redis.memoryCacheSize },
-      businessRules: { maxOrderQuantity: appConfig.businessRules.maxOrderQuantity },
-      backup: { schedule: appConfig.backup.schedule },
-    })}`);
+    logger.log(
+      `Configuration loaded: ${JSON.stringify({
+        redis: { memoryCacheSize: appConfig.redis.memoryCacheSize },
+        businessRules: {
+          maxOrderQuantity: appConfig.businessRules.maxOrderQuantity,
+        },
+        backup: { schedule: appConfig.backup.schedule },
+      })}`,
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('❌ Application configuration validation failed');
@@ -99,17 +105,14 @@ async function bootstrap() {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
     const { method, originalUrl, ip } = req;
-    const user =
-      (req as Request & { user?: { username?: string } }).user?.username ||
-      'anonymous';
+    const user = (req as Request & { user?: { username?: string } }).user?.username || 'anonymous';
 
     res.on('finish', () => {
       const duration = Date.now() - start;
       const { statusCode } = res;
 
       // Structured logging with metadata
-      const logLevel =
-        statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
+      const logLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
       const message = `${method} ${originalUrl} ${statusCode} ${duration}ms`;
 
       const metadata = {
@@ -190,9 +193,7 @@ async function bootstrap() {
   );
 
   // Enable CORS with validated origins
-  const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map((origin) =>
-    origin.trim(),
-  );
+  const allowedOrigins = config.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim());
 
   app.enableCors({
     origin: allowedOrigins,
@@ -241,8 +242,7 @@ async function bootstrap() {
         type: 'apiKey',
         in: 'header',
         name: 'x-csrf-token',
-        description:
-          'CSRF token from cookie (required for POST/PUT/PATCH/DELETE)',
+        description: 'CSRF token from cookie (required for POST/PUT/PATCH/DELETE)',
       },
       'CSRF',
     )
@@ -266,13 +266,83 @@ async function bootstrap() {
     },
   });
 
-  logger.log(
-    `📚 API Documentation available at: http://localhost:${config.PORT || 3000}/api/docs`,
-  );
+  logger.log(`📚 API Documentation available at: http://localhost:${config.PORT || 3000}/api/docs`);
 
   const port = config.PORT || 3000;
   await app.listen(port);
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
+
+  // Setup global error handlers for production safety
+  setupGlobalErrorHandlers(app, logger);
+}
+
+/**
+ * Setup global error handlers to catch unhandled errors
+ * This prevents silent failures and ensures all errors are logged
+ */
+function setupGlobalErrorHandlers(app: any, logger: LoggerService) {
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error: Error) => {
+    logger.error('🔥 UNCAUGHT EXCEPTION - Application will shutdown', error.stack, {
+      name: error.name,
+      message: error.message,
+      type: 'uncaughtException',
+    });
+
+    // Give time for logs to flush
+    setTimeout(() => {
+      process.exit(1);
+    }, 1000);
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    logger.error(
+      '🔥 UNHANDLED REJECTION - Potential memory leak',
+      reason instanceof Error ? reason.stack : String(reason),
+      {
+        reason: reason instanceof Error ? reason.message : String(reason),
+        promise: String(promise),
+        type: 'unhandledRejection',
+      },
+    );
+  });
+
+  // Handle SIGTERM for graceful shutdown
+  process.on('SIGTERM', async () => {
+    logger.log('📴 SIGTERM received - Starting graceful shutdown');
+
+    try {
+      await app.close();
+      logger.log('✅ Application closed gracefully');
+      process.exit(0);
+    } catch (error) {
+      logger.error(
+        '❌ Error during graceful shutdown',
+        error instanceof Error ? error.stack : String(error),
+      );
+      process.exit(1);
+    }
+  });
+
+  // Handle SIGINT (Ctrl+C) for graceful shutdown
+  process.on('SIGINT', async () => {
+    logger.log('📴 SIGINT received - Starting graceful shutdown');
+
+    try {
+      await app.close();
+      logger.log('✅ Application closed gracefully');
+      process.exit(0);
+    } catch (error) {
+      logger.error(
+        '❌ Error during graceful shutdown',
+        error instanceof Error ? error.stack : String(error),
+      );
+      process.exit(1);
+    }
+  });
+
+  logger.log('✅ Global error handlers configured');
 }
 
 bootstrap().catch((error: unknown) => {

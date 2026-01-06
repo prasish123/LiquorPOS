@@ -81,10 +81,7 @@ export class SentryService implements OnModuleInit {
             }
 
             // Remove sensitive query params
-            if (
-              event.request.query_string &&
-              typeof event.request.query_string === 'string'
-            ) {
+            if (event.request.query_string && typeof event.request.query_string === 'string') {
               event.request.query_string = event.request.query_string
                 .replace(/password=[^&]*/gi, 'password=[REDACTED]')
                 .replace(/token=[^&]*/gi, 'token=[REDACTED]')
@@ -135,19 +132,14 @@ export class SentryService implements OnModuleInit {
   private loadConfig(): SentryConfig {
     const dsn = process.env.SENTRY_DSN;
     const environment = process.env.NODE_ENV || 'development';
-    const release =
-      process.env.SENTRY_RELEASE || process.env.npm_package_version;
+    const release = process.env.SENTRY_RELEASE || process.env.npm_package_version;
 
     // Sentry is enabled if DSN is provided
     const enabled = !!dsn;
 
     // Sample rates (0.0 to 1.0)
-    const tracesSampleRate = parseFloat(
-      process.env.SENTRY_TRACES_SAMPLE_RATE || '1.0',
-    );
-    const profilesSampleRate = parseFloat(
-      process.env.SENTRY_PROFILES_SAMPLE_RATE || '1.0',
-    );
+    const tracesSampleRate = parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '1.0');
+    const profilesSampleRate = parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '1.0');
 
     return {
       dsn,
@@ -249,11 +241,7 @@ export class SentryService implements OnModuleInit {
   /**
    * Start a new transaction for performance monitoring
    */
-  startTransaction(
-    name: string,
-    op: string,
-    description?: string,
-  ): Sentry.Transaction | undefined {
+  startTransaction(name: string, op: string, description?: string): Sentry.Transaction | undefined {
     if (!this.initialized) {
       return undefined;
     }

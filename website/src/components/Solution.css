@@ -13,12 +13,24 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: white;
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(30px);
 }
+
+.solution-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.solution-card:nth-child(1) { transition-delay: 0.1s; }
+.solution-card:nth-child(2) { transition-delay: 0.2s; }
+.solution-card:nth-child(3) { transition-delay: 0.3s; }
 
 .solution-card:hover {
   border-color: var(--color-accent);
-  box-shadow: 0 8px 24px rgba(0, 113, 227, 0.1);
+  box-shadow: 0 12px 40px rgba(0, 113, 227, 0.15);
+  transform: translateY(-8px);
 }
 
 .solution-icon {

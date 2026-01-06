@@ -1,0 +1,113 @@
+# =============================================================================
+# Liquor POS System - Development Override
+# =============================================================================
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# This file overrides production settings for local development
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Development Settings
+  # ---------------------------------------------------------------------------
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: liquor_pos_dev
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./backend/backups:/backups
+
+  # ---------------------------------------------------------------------------
+  # Redis - Development Settings (no password)
+  # ---------------------------------------------------------------------------
+  redis:
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_dev_data:/data
+
+  # ---------------------------------------------------------------------------
+  # Backend - Development Settings (hot reload)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: liquor-pos-backend-dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://dev:dev@postgres:5432/liquor_pos_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-in-production-min-32-chars
+      AUDIT_LOG_ENCRYPTION_KEY: ZGV2LWVuY3J5cHRpb24ta2V5LTMyLWNoYXJzISE=
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_}
+      LOG_LEVEL: debug
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/src:/app/src:ro
+      - ./backend/prisma:/app/prisma:ro
+      - ./backend/test:/app/test:ro
+      - ./backend/backups:/app/backups
+      - backend_dev_logs:/app/logs
+    command: npm run start:dev
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port for Node.js inspector
+    healthcheck:
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Frontend - Development Settings (Vite dev server)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: liquor-pos-frontend-dev
+    environment:
+      VITE_API_URL: http://localhost:3000
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      - ./frontend/index.html:/app/index.html:ro
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+
+# =============================================================================
+# Development Volumes
+# =============================================================================
+volumes:
+  postgres_dev_data:
+    driver: local
+    name: liquor-pos-postgres-dev-data
+  redis_dev_data:
+    driver: local
+    name: liquor-pos-redis-dev-data
+  backend_dev_logs:
+    driver: local
+    name: liquor-pos-backend-dev-logs
+

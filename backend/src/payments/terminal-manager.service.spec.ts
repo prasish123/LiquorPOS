@@ -230,9 +230,9 @@ describe('TerminalManagerService', () => {
     });
 
     it('should throw error for non-existent terminal', async () => {
-      await expect(
-        service.updateTerminal('term-999', { name: 'Updated' }),
-      ).rejects.toThrow('Terminal term-999 not found');
+      await expect(service.updateTerminal('term-999', { name: 'Updated' })).rejects.toThrow(
+        'Terminal term-999 not found',
+      );
     });
   });
 
@@ -360,4 +360,3 @@ describe('TerminalManagerService', () => {
     });
   });
 });
-

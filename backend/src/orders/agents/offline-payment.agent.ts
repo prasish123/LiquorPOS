@@ -38,15 +38,12 @@ export class OfflinePaymentAgent {
 
   private config: OfflinePaymentConfig = {
     enabled: process.env.OFFLINE_PAYMENTS_ENABLED === 'true',
-    maxTransactionAmount: parseFloat(
-      process.env.OFFLINE_MAX_TRANSACTION_AMOUNT || '500',
-    ),
+    maxTransactionAmount: parseFloat(process.env.OFFLINE_MAX_TRANSACTION_AMOUNT || '500'),
     maxDailyTotal: parseFloat(process.env.OFFLINE_MAX_DAILY_TOTAL || '5000'),
-    requireManagerApproval:
-      process.env.OFFLINE_REQUIRE_MANAGER_APPROVAL === 'true',
-    allowedPaymentMethods: (
-      process.env.OFFLINE_ALLOWED_PAYMENT_METHODS || 'cash,card'
-    ).split(',') as ('cash' | 'card')[],
+    requireManagerApproval: process.env.OFFLINE_REQUIRE_MANAGER_APPROVAL === 'true',
+    allowedPaymentMethods: (process.env.OFFLINE_ALLOWED_PAYMENT_METHODS || 'cash,card').split(
+      ',',
+    ) as ('cash' | 'card')[],
   };
 
   constructor(
@@ -181,11 +178,11 @@ export class OfflinePaymentAgent {
     const canProcess = await this.canProcessOffline(amount, method, locationId);
 
     if (!canProcess.allowed) {
-      this.logger.error(
-        `Offline payment rejected: ${canProcess.reason}`,
-        undefined,
-        { amount, method, locationId },
-      );
+      this.logger.error(`Offline payment rejected: ${canProcess.reason}`, undefined, {
+        amount,
+        method,
+        locationId,
+      });
 
       return {
         paymentId,
@@ -203,9 +200,7 @@ export class OfflinePaymentAgent {
 
     // For cash, immediately mark as captured
     if (method === 'cash') {
-      this.logger.log(
-        `Offline cash payment authorized: ${paymentId} for $${amount}`,
-      );
+      this.logger.log(`Offline cash payment authorized: ${paymentId} for $${amount}`);
 
       return {
         paymentId,
@@ -231,13 +226,7 @@ export class OfflinePaymentAgent {
     );
 
     // Log offline payment for audit
-    await this.logOfflinePayment(
-      paymentId,
-      amount,
-      method,
-      locationId,
-      metadata,
-    );
+    await this.logOfflinePayment(paymentId, amount, method, locationId, metadata);
 
     return {
       paymentId,
@@ -335,9 +324,7 @@ export class OfflinePaymentAgent {
     paymentId: string,
     processorId: string,
   ): Promise<{ success: boolean; error?: string }> {
-    this.logger.log(
-      `Attempting to capture offline payment: ${paymentId} (${processorId})`,
-    );
+    this.logger.log(`Attempting to capture offline payment: ${paymentId} (${processorId})`);
 
     // Check if we're back online
     if (!this.networkStatus.isStripeAvailable()) {
@@ -364,8 +351,7 @@ export class OfflinePaymentAgent {
       this.logger.log(`Successfully captured offline payment: ${paymentId}`);
       return { success: true };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Failed to capture offline payment: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
@@ -399,9 +385,7 @@ export class OfflinePaymentAgent {
   /**
    * Get pending offline payments that need to be captured
    */
-  async getPendingOfflinePayments(
-    locationId?: string,
-  ): Promise<
+  async getPendingOfflinePayments(locationId?: string): Promise<
     Array<{
       paymentId: string;
       amount: number;
@@ -496,11 +480,8 @@ export class OfflinePaymentAgent {
     });
 
     stats.averageAmount =
-      stats.totalOfflinePayments > 0
-        ? stats.totalAmount / stats.totalOfflinePayments
-        : 0;
+      stats.totalOfflinePayments > 0 ? stats.totalAmount / stats.totalOfflinePayments : 0;
 
     return stats;
   }
 }
-

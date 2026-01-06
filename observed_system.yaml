@@ -1,0 +1,636 @@
+# ==============================================================================
+# OBSERVED SYSTEM ANALYSIS - LIQUOR POS
+# ==============================================================================
+# Generated: 2026-01-05
+# Analysis Type: Factual observation of running system
+# Scope: Backend + Frontend + Infrastructure
+# ==============================================================================
+
+observed_system:
+  
+  # ============================================================================
+  # 1. USER ROLES
+  # ============================================================================
+  user_roles:
+    - role: ADMIN
+      source: backend/prisma/schema.prisma (enum Role)
+      capabilities:
+        - Full system access
+        - Backup operations (RolesGuard enforced)
+        - User management
+        - All manager and cashier capabilities
+      authentication:
+        - Username/password (bcrypt hashed)
+        - Optional PIN (4-6 digits, hashed)
+        - JWT token (HttpOnly cookie, 8-hour expiry)
+      frontend_routes:
+        - /admin/* (Dashboard, Products, Users, Settings)
+        - /pos (POS Terminal)
+      
+    - role: MANAGER
+      source: backend/prisma/schema.prisma (enum Role)
+      capabilities:
+        - Price override authorization (PIN-based)
+        - Admin panel access (limited)
+        - All cashier capabilities
+      authentication:
+        - Username/password (bcrypt hashed)
+        - PIN required for price overrides
+        - JWT token (HttpOnly cookie, 8-hour expiry)
+      frontend_routes:
+        - /admin/* (Dashboard, Products, Users, Settings)
+        - /pos (POS Terminal)
+      special_functions:
+        - Price override approval via PIN (PriceOverrideService)
+        - Validates via PinAuthService.validateManagerRole()
+    
+    - role: CASHIER
+      source: backend/prisma/schema.prisma (enum Role)
+      capabilities:
+        - POS terminal operations
+        - Product search and cart management
+        - Transaction processing
+        - Age verification
+        - Receipt generation
+      authentication:
+        - Username/password (bcrypt hashed)
+        - Optional PIN for quick access
+        - JWT token (HttpOnly cookie, 8-hour expiry)
+      frontend_routes:
+        - /pos (POS Terminal only)
+      restrictions:
+        - Cannot access /admin routes (ProtectedRoute enforces)
+        - Cannot override prices without manager PIN
+
+  # ============================================================================
+  # 2. END-TO-END WORKFLOWS
+  # ============================================================================
+  workflows:
+    
+    - name: User Authentication
+      trigger: POST /auth/login
+      steps:
+        - Client requests CSRF token (GET /auth/csrf-token)
+        - Client submits username/password with CSRF token
+        - Backend validates credentials (bcrypt comparison)
+        - Backend generates JWT with jti (unique token ID)
+        - Backend sets HttpOnly cookie (access_token, 8-hour expiry)
+        - Backend returns user object (id, username, role, firstName, lastName)
+        - Frontend stores user in localStorage and AuthContext
+        - Session validated on page load (GET /auth/validate)
+      rate_limiting: 5 attempts per 60 seconds (ThrottlerGuard)
+      security:
+        - CSRF protection enforced
+        - JWT stored in HttpOnly cookie
+        - Token revocation via Redis blacklist
+      logout_flow:
+        - POST /auth/logout with CSRF token
+        - Backend blacklists JWT in Redis
+        - Backend clears access_token cookie
+        - Frontend clears localStorage and AuthContext
+
+    - name: POS Transaction (Complete Sale)
+      trigger: User clicks "Complete Sale" in Checkout component
+      actors: [CASHIER, MANAGER, ADMIN]
+      steps:
+        - Frontend validates cart has items
+        - Frontend checks age verification if alcohol present
+        - Frontend calculates subtotal, tax, total (client-side)
+        - Frontend sends POST /orders with CreateOrderDto
+        - Backend processes via OrderOrchestrator (SAGA pattern)
+        - Step 1 - Inventory reservation (InventoryAgent)
+          - SELECT FOR UPDATE lock on inventory rows
+          - Validates available quantity (quantity - reserved)
+          - Atomically increments reserved field
+          - Rollback on failure
+        - Step 2 - Pricing calculation (PricingAgent)
+          - Trusts POS-provided values if present (Source of Truth)
+          - Otherwise calculates from product basePrice + location tax
+          - Florida default: 7% state + optional county tax
+        - Step 3 - Compliance check (ComplianceAgent)
+          - Validates age verification for alcohol (21+ requirement)
+          - Checks customer DOB if customerId provided
+          - Throws ForbiddenException if verification fails
+        - Step 4 - Payment processing (PaymentAgent or OfflinePaymentAgent)
+          - Cash: Immediate capture, no external call
+          - Card: Stripe Payment Intent creation
+          - Offline fallback: OfflinePaymentAgent if Stripe unavailable
+          - Queues payment capture for later sync
+        - Step 5 - Transaction creation (Prisma transaction)
+          - Creates Transaction record with idempotency key
+          - Creates TransactionItem records
+          - Creates Payment record(s)
+          - Creates ComplianceEvent if age-restricted
+          - Commits inventory reservation (decrements quantity, clears reserved)
+        - Step 6 - Event emission
+          - Emits order.created event (EventEmitter2)
+          - BusinessMetricsService tracks metrics
+        - Backend returns OrderResponseDto
+        - Frontend shows success toast
+        - Frontend clears cart after 2-second delay
+      idempotency: 
+        - Enforced via idempotencyKey (UUID from frontend)
+        - Duplicate requests return cached transaction
+        - Logged via AuditService.logIdempotencyCheck()
+      compensation:
+        - Inventory rollback on payment failure
+        - Payment refund on inventory failure (after payment)
+        - Full transaction rollback on any step failure
+      rate_limiting: 30 orders per 60 seconds per terminal
+
+    - name: Price Override
+      trigger: Manager enters PIN for price adjustment
+      actors: [MANAGER, ADMIN]
+      steps:
+        - Cashier requests price override in POS
+        - Manager enters PIN
+        - Frontend sends override request with managerPin
+        - Backend validates PIN via PinAuthService
+        - Backend validates manager role (MANAGER or ADMIN)
+        - Backend validates override amount (warns if >50% discount)
+        - Backend creates PriceOverride record
+        - Backend updates TransactionItem with new price
+        - Backend recalculates transaction totals
+        - Backend logs to AuditLog (PRICE_OVERRIDE event)
+        - Returns approval confirmation
+      audit_trail:
+        - Records: managerId, managerName, cashierId, cashierName
+        - Records: originalPrice, overridePrice, reason, reasonNotes
+        - Records: terminalId, timestamp
+        - Immutable record (no updates/deletes allowed)
+
+    - name: Product Search
+      trigger: User types in ProductSearch component
+      actors: [CASHIER, MANAGER, ADMIN]
+      methods:
+        - standard_search:
+            endpoint: GET /api/products/search?query={text}
+            implementation: PostgreSQL ILIKE on name, SKU, description
+            indexed: searchText field (concatenated text)
+        - ai_search:
+            endpoint: GET /api/products/ai-search?query={text}
+            implementation: OpenAI embeddings + vector similarity
+            optional: Requires OPENAI_API_KEY environment variable
+            fallback: Returns empty if not configured
+      returns: Product list with SKU, name, basePrice, category, ageRestricted
+
+    - name: Inventory Adjustment
+      trigger: POST /api/inventory/adjust
+      actors: [MANAGER, ADMIN]
+      steps:
+        - Frontend sends AdjustInventoryDto (productId, locationId, quantity, reason)
+        - Backend validates product and location exist
+        - Backend updates Inventory.quantity
+        - Backend logs adjustment reason (sale, restock, damage, count)
+        - Backend emits inventory.updated event
+      locking: Row-level lock during adjustment (prevents race conditions)
+      rate_limiting: 50 adjustments per 60 seconds
+
+    - name: Daily Sales Report
+      trigger: GET /reporting/sales/daily?date={YYYY-MM-DD}
+      actors: [MANAGER, ADMIN]
+      steps:
+        - Backend queries Transaction table for date range
+        - Aggregates: total revenue, transaction count, payment methods
+        - Groups by hour for hourly breakdown
+        - Returns DailySalesReportDto
+      export_formats: [CSV, Excel, PDF]
+
+    - name: Receipt Generation
+      trigger: POST /receipts/:transactionId/generate
+      actors: [CASHIER, MANAGER, ADMIN]
+      steps:
+        - Backend fetches Transaction with items, location, customer
+        - Backend generates plain text receipt (80-column thermal printer format)
+        - Backend generates HTML receipt (browser print)
+        - Backend stores in Receipt table (content, htmlContent)
+        - Backend tracks printedAt, reprintCount
+        - Returns receipt text
+      reprint: GET /receipts/:transactionId (increments reprintCount)
+
+    - name: Webhook Processing (Stripe)
+      trigger: POST /webhooks/stripe (external)
+      authentication: Stripe signature verification (STRIPE_WEBHOOK_SECRET)
+      events_handled:
+        - payment_intent.succeeded: Updates Payment status to captured
+        - payment_intent.payment_failed: Updates Payment status to failed
+        - payment_intent.canceled: Updates Payment status to canceled
+        - charge.refunded: Creates refund record
+        - charge.dispute.created: Logs dispute
+      idempotency: Stored in EventLog table, prevents duplicate processing
+      no_auth_guard: Public endpoint, secured by signature verification
+
+    - name: Webhook Processing (Delivery Platforms)
+      trigger: POST /webhooks/ubereats OR POST /webhooks/doordash
+      authentication: Signature verification (not fully implemented, logs warning)
+      steps:
+        - Stores webhook event in EventLog (idempotency)
+        - Transforms platform-specific payload to CreateOrderDto
+        - Processes via OrderOrchestrator
+        - Marks event as processed
+        - Returns orderId
+      platforms:
+        - Uber Eats: Handles orders.notification event
+        - DoorDash: Handles order.created event
+      channel: Sets Transaction.channel to 'uber_eats' or 'doordash'
+
+    - name: Offline Transaction Sync
+      trigger: Network reconnection detected
+      actors: [System background process]
+      steps:
+        - OfflineQueueService detects network online
+        - Processes queued transactions by priority
+        - Retries failed payment captures
+        - Syncs local SQLite to PostgreSQL (if offline mode used)
+        - Updates Transaction.syncedToCloud flag
+        - Emits sync.completed event
+      queue_types:
+        - transaction: Full transaction data
+        - payment_capture: Deferred Stripe capture
+        - inventory_sync: Inventory adjustments
+
+    - name: Backup Operations
+      trigger: Manual or scheduled (BackupService)
+      actors: [ADMIN only - RolesGuard enforced]
+      endpoints:
+        - POST /backup/create: Creates PostgreSQL dump
+        - GET /backup/list: Lists available backups
+        - POST /backup/restore/:filename: Restores from backup
+        - POST /backup/verify/:filename: Validates backup integrity
+      storage: ./backend/backups/ directory
+      format: PostgreSQL custom format (.dump)
+
+  # ============================================================================
+  # 3. IMPLICIT INVARIANTS
+  # ============================================================================
+  invariants:
+    
+    - invariant: Age Verification Enforcement
+      description: Transactions with age-restricted items MUST have ageVerified=true
+      enforcement: ComplianceAgent throws ForbiddenException if not verified
+      minimum_age: 21 (Florida law)
+      verification_methods:
+        - Manual cashier verification (ageVerified flag)
+        - Customer DOB check if customerId provided
+      audit: Logged in ComplianceEvent table
+      
+    - invariant: Inventory Consistency
+      description: Inventory quantity never goes negative during reservation
+      enforcement: SELECT FOR UPDATE lock + atomic update in transaction
+      implementation: InventoryAgent.checkAndReserve()
+      rollback: Automatic on transaction failure
+      
+    - invariant: Idempotency
+      description: Duplicate order requests with same idempotencyKey return cached result
+      enforcement: Unique constraint on Transaction.idempotencyKey
+      implementation: OrdersController checks existing transaction before processing
+      audit: Logged via AuditService.logIdempotencyCheck()
+      
+    - invariant: Price Override Authorization
+      description: Price overrides require manager/admin PIN authentication
+      enforcement: PriceOverrideService validates PIN + role
+      audit: Immutable PriceOverride record with manager details
+      restrictions:
+        - Override price cannot be negative
+        - Warns if discount > 50% (but allows)
+      
+    - invariant: JWT Token Revocation
+      description: Logged-out tokens are blacklisted and rejected
+      enforcement: JwtAuthGuard checks Redis blacklist before accepting token
+      storage: Redis with TTL matching JWT expiry
+      
+    - invariant: CSRF Protection
+      description: State-changing requests require valid CSRF token
+      enforcement: CsrfGuard validates x-csrf-token header
+      exemptions: Webhook endpoints (use signature verification instead)
+      
+    - invariant: Tax Calculation
+      description: Tax calculated from location-specific rates
+      default: 7% Florida state tax (Location.taxRate)
+      optional: County tax (Location.countyTaxRate)
+      source_of_truth: POS frontend calculates, backend trusts if provided
+      
+    - invariant: Payment Method Routing
+      description: Cash payments bypass Stripe, card payments require Stripe or offline mode
+      enforcement: PaymentAgent routes based on method
+      offline_fallback: OfflinePaymentAgent if Stripe unavailable
+      
+    - invariant: Audit Log Immutability
+      description: AuditLog records cannot be modified or deleted
+      enforcement: Database-level constraints (migration 20260103193315)
+      events_logged:
+        - PAYMENT_ACCESS
+        - AGE_VERIFICATION
+        - PRICE_OVERRIDE
+        - ORDER_CREATION
+        - IDEMPOTENCY_CHECK
+      
+    - invariant: Receipt Persistence
+      description: Receipt content stored for reprints
+      enforcement: Receipt table stores plain text + HTML
+      tracking: printedAt, reprintCount, lastReprintAt
+      
+    - invariant: Role-Based Access Control
+      description: Backend endpoints enforce role restrictions
+      enforcement: RolesGuard + @Roles decorator
+      frontend: ProtectedRoute component enforces UI access
+      examples:
+        - Backup operations: ADMIN only
+        - Price overrides: MANAGER or ADMIN
+        - POS terminal: All roles
+        - Admin panel: MANAGER or ADMIN
+
+  # ============================================================================
+  # 4. INTEGRATIONS
+  # ============================================================================
+  integrations:
+    
+    - name: PostgreSQL
+      type: Database (Primary)
+      version: "16"
+      connection:
+        - Via Prisma ORM with pg adapter
+        - Connection string: DATABASE_URL environment variable
+        - Pool: min=2, max=10 (configurable)
+      usage:
+        - All persistent data storage
+        - Transactional consistency (ACID)
+        - Row-level locking (SELECT FOR UPDATE)
+      health_check: GET /health/db
+      
+    - name: Redis
+      type: Cache + Session Store
+      version: "7"
+      connection:
+        - Via ioredis client
+        - Connection: REDIS_URL environment variable
+        - Password protected (REDIS_PASSWORD)
+      usage:
+        - JWT token blacklist (logout)
+        - Session data caching
+        - Rate limiting counters (ThrottlerGuard)
+        - Offline queue storage
+      persistence: AOF (append-only file) enabled
+      eviction: allkeys-lru policy, 256MB max memory
+      health_check: GET /health/redis
+      
+    - name: Stripe
+      type: Payment Processor
+      api_version: "2025-12-15.clover"
+      authentication: STRIPE_SECRET_KEY environment variable
+      usage:
+        - Card payment processing (Payment Intent API)
+        - Webhook event handling (payment status updates)
+        - Refund processing
+      timeout: 30 seconds
+      retries: 3 max network retries
+      fallback: OfflinePaymentAgent if unavailable
+      health_check: Checked via NetworkStatusService.isStripeAvailable()
+      webhook_endpoint: POST /webhooks/stripe
+      webhook_secret: STRIPE_WEBHOOK_SECRET
+      
+    - name: PAX Payment Terminals
+      type: Hardware Integration
+      implementation: PaxTerminalAgent
+      connection:
+        - IP address + port (configured per terminal)
+        - Stored in PaymentTerminal table
+      operations:
+        - Sale, refund, void, auth, capture
+        - Transaction status polling
+        - Terminal health check
+      management:
+        - POST /payments/terminals (register)
+        - GET /payments/terminals (list)
+        - PUT /payments/terminals/:id (update)
+        - DELETE /payments/terminals/:id (unregister)
+        - GET /payments/terminals/:id/health (status)
+      transaction_log: PaxTransaction table
+      
+    - name: Uber Eats
+      type: Delivery Platform
+      webhook: POST /webhooks/ubereats
+      authentication: x-ubereats-signature header (not fully implemented)
+      events: orders.notification
+      transformation: DeliveryPlatformTransformerService
+      channel: Sets Transaction.channel = 'uber_eats'
+      
+    - name: DoorDash
+      type: Delivery Platform
+      webhook: POST /webhooks/doordash
+      authentication: x-doordash-signature header (not fully implemented)
+      events: order.created
+      transformation: DeliveryPlatformTransformerService
+      channel: Sets Transaction.channel = 'doordash'
+      
+    - name: OpenAI
+      type: AI Service (Optional)
+      usage: Product search embeddings (semantic search)
+      authentication: OPENAI_API_KEY environment variable
+      feature_flag: ENABLE_AI_FEATURES
+      fallback: Standard search if not configured
+      endpoint: GET /api/products/ai-search
+      
+    - name: Sentry
+      type: Error Tracking (Optional)
+      authentication: SENTRY_DSN environment variable
+      usage: Exception monitoring and alerting
+      environment: SENTRY_ENVIRONMENT (production/staging/dev)
+      
+    - name: SQLite (Offline Mode)
+      type: Local Database
+      usage: Offline transaction storage (browser-side)
+      location: IndexedDB via OPFS (Origin Private File System)
+      sync: Syncs to PostgreSQL when online
+      implementation: Frontend infrastructure/db.ts
+
+  # ============================================================================
+  # 5. STARTUP ASSUMPTIONS
+  # ============================================================================
+  startup_assumptions:
+    
+    migrations:
+      required: true
+      tool: Prisma Migrate
+      location: backend/prisma/migrations/
+      applied_migrations:
+        - 20260103_add_payment_terminals
+        - 20260103193315_audit_log_immutability
+        - 20260103195414_price_override
+        - 20260103201530_receipt
+      auto_apply: Runs on backend startup (Dockerfile CMD or manual)
+      rollback_scripts: Included in migration folders
+      
+    environment_variables:
+      required:
+        - JWT_SECRET: 64-byte hex string (JWT signing)
+        - AUDIT_LOG_ENCRYPTION_KEY: 32-byte base64 (audit log encryption)
+        - DB_PASSWORD: PostgreSQL password
+        - REDIS_PASSWORD: Redis password
+        - DATABASE_URL: Full PostgreSQL connection string
+      optional:
+        - STRIPE_SECRET_KEY: Required for card payments
+        - STRIPE_WEBHOOK_SECRET: Required for Stripe webhooks
+        - OPENAI_API_KEY: Required for AI search
+        - SENTRY_DSN: Required for error tracking
+        - ALLOWED_ORIGINS: CORS configuration (default: localhost)
+      frontend:
+        - VITE_API_URL: Backend API URL (default: http://localhost:3000)
+        - VITE_LOCATION_ID: POS location ID (validated on startup)
+        - VITE_TERMINAL_ID: POS terminal ID (validated on startup)
+      generation:
+        - JWT_SECRET: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+        - AUDIT_LOG_ENCRYPTION_KEY: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+      
+    seed_data:
+      script: backend/prisma/seed.ts
+      execution: Manual (npm run seed) or via Dockerfile
+      creates:
+        - Default location (loc-001, Main Store, Miami FL)
+        - Sample products (5 items: wine, beer, spirits, mixer, snack)
+        - Sample customer (john.doe@example.com)
+        - Default users:
+          - admin / password123 (ADMIN role)
+          - manager / password123 (MANAGER role)
+          - cashier / password123 (CASHIER role)
+        - Inventory records (100 units per product at Main Store)
+      idempotency: Uses upsert (safe to run multiple times)
+      
+    docker_services:
+      orchestration: docker-compose.yml
+      services:
+        - postgres:
+            image: postgres:16-alpine
+            port: 5432
+            volumes: [postgres_data, ./backend/backups]
+            health_check: pg_isready
+        - redis:
+            image: redis:7-alpine
+            port: 6379
+            volumes: [redis_data]
+            persistence: AOF enabled
+            health_check: redis-cli ping
+        - backend:
+            build: ./backend/Dockerfile (multi-stage)
+            port: 3000
+            depends_on: [postgres, redis]
+            health_check: curl /health
+        - frontend:
+            build: ./frontend/Dockerfile (nginx)
+            port: 80
+            depends_on: [backend]
+            health_check: curl /
+      startup_order:
+        1. postgres + redis (parallel)
+        2. backend (waits for postgres + redis health)
+        3. frontend (waits for backend health)
+      
+    health_checks:
+      liveness: GET /health/live (memory check only)
+      readiness: GET /health/ready (database + redis)
+      full: GET /health (all subsystems)
+      kubernetes_ready: true (separate endpoints for k8s probes)
+      
+    logging:
+      level: LOG_LEVEL environment variable (default: info)
+      format: JSON (structured logging)
+      destinations:
+        - stdout/stderr (Docker logs)
+        - backend_logs volume (persistent)
+      correlation: X-Correlation-ID header (CorrelationIdMiddleware)
+      
+    rate_limiting:
+      implementation: ThrottlerGuard (NestJS)
+      storage: Redis
+      limits:
+        - default: 100 requests per 60 seconds
+        - strict (login): 5 requests per 60 seconds
+        - orders: 30 requests per 60 seconds
+        - inventory: 50 requests per 60 seconds
+      
+    security:
+      cors:
+        - Enabled via ALLOWED_ORIGINS environment variable
+        - Default: http://localhost,http://localhost:80
+      csrf:
+        - Enforced on all POST/PUT/DELETE/PATCH
+        - Token endpoint: GET /auth/csrf-token
+        - Header: x-csrf-token
+      jwt:
+        - Algorithm: HS256
+        - Expiry: 8 hours
+        - Storage: HttpOnly cookie (access_token)
+        - Revocation: Redis blacklist
+      passwords:
+        - Hashing: bcrypt with 10 salt rounds
+        - PINs: Also bcrypt hashed (not plaintext)
+      audit:
+        - Encryption: AES-256-GCM (AUDIT_LOG_ENCRYPTION_KEY)
+        - Immutability: Database constraints prevent modification
+
+  # ============================================================================
+  # 6. OBSERVED BEHAVIORS
+  # ============================================================================
+  observed_behaviors:
+    
+    - behavior: Double-click prevention on checkout
+      description: Checkout button disables during processing to prevent duplicate orders
+      implementation: processing state in Checkout.tsx
+      issue_history: Fixed in RED-001 (double-click bug)
+      
+    - behavior: Offline mode fallback
+      description: System queues transactions when Stripe unavailable
+      implementation: OfflinePaymentAgent + OfflineQueueService
+      sync: Processes queue when network restored
+      feature_flag: ENABLE_OFFLINE_MODE (default: true)
+      
+    - behavior: Source of truth for pricing
+      description: POS frontend calculates prices, backend trusts if provided
+      rationale: Prevents recalculation discrepancies
+      fallback: Backend calculates if not provided
+      
+    - behavior: Manager override via PIN
+      description: Managers can override prices without full login
+      implementation: PIN stored hashed, validated via PinAuthService
+      audit: Full audit trail in PriceOverride table
+      
+    - behavior: Idempotency on order creation
+      description: Duplicate requests with same idempotencyKey return cached result
+      implementation: Unique constraint + pre-check in OrdersController
+      prevents: Double-charging on network retry
+      
+    - behavior: Inventory locking
+      description: SELECT FOR UPDATE prevents race conditions on inventory
+      implementation: InventoryAgent uses raw SQL with row lock
+      prevents: Overselling when multiple cashiers access same product
+      
+    - behavior: SAGA pattern for orders
+      description: Multi-step order processing with compensation
+      steps: [inventory, pricing, compliance, payment, transaction]
+      rollback: Automatic on any step failure
+      implementation: OrderOrchestrator
+      
+    - behavior: Event-driven architecture
+      description: Order events trigger downstream processes
+      implementation: EventEmitter2
+      listeners: BusinessMetricsService, monitoring, webhooks
+      
+    - behavior: Receipt persistence
+      description: Receipts stored for unlimited reprints
+      implementation: Receipt table with content + htmlContent
+      tracking: Reprint count and timestamps
+      
+    - behavior: Session validation on page load
+      description: Frontend validates JWT on mount
+      implementation: AuthProvider useEffect
+      action: Clears session if invalid/expired
+      
+    - behavior: Webhook idempotency
+      description: Duplicate webhook events ignored
+      implementation: EventLog table with unique event_id
+      prevents: Double-processing of Stripe/delivery platform events
+
+# ==============================================================================
+# END OF OBSERVED SYSTEM ANALYSIS
+# ==============================================================================
+

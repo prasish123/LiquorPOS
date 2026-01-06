@@ -10,19 +10,9 @@ import { ProductsModule } from '../../products/products.module';
 import { PrismaService } from '../../prisma.service';
 
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    InventoryModule,
-    OrdersModule,
-    ProductsModule,
-  ],
+  imports: [ScheduleModule.forRoot(), InventoryModule, OrdersModule, ProductsModule],
   controllers: [ConexxusController],
-  providers: [
-    ConexxusService,
-    ConexxusHttpClient,
-    ConexxusOfflineService,
-    PrismaService,
-  ],
+  providers: [ConexxusService, ConexxusHttpClient, ConexxusOfflineService, PrismaService],
   exports: [ConexxusService, ConexxusOfflineService],
 })
 export class ConexxusModule {}

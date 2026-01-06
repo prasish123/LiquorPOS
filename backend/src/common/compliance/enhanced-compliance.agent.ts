@@ -118,9 +118,7 @@ export class EnhancedComplianceAgent {
 
     // Age verification required but not provided
     if (!ageVerified) {
-      throw new ForbiddenException(
-        'Age verification required for alcohol purchases',
-      );
+      throw new ForbiddenException('Age verification required for alcohol purchases');
     }
 
     // Validate ID type if provided
@@ -133,9 +131,7 @@ export class EnhancedComplianceAgent {
 
       // Check if ID scanning is required
       if (regulation.requiresIdScan && idVerification.verificationMethod === 'manual') {
-        warnings.push(
-          `${regulation.state} requires ID scanning for alcohol sales`,
-        );
+        warnings.push(`${regulation.state} requires ID scanning for alcohol sales`);
       }
     }
 
@@ -222,10 +218,7 @@ export class EnhancedComplianceAgent {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 
@@ -235,9 +228,7 @@ export class EnhancedComplianceAgent {
   /**
    * Log comprehensive compliance event
    */
-  async logComplianceEvent(
-    reportData: ComplianceReportData,
-  ): Promise<void> {
+  async logComplianceEvent(reportData: ComplianceReportData): Promise<void> {
     const encryptedDetails = this.encryption.encrypt(
       JSON.stringify({
         customerId: reportData.customerId,
@@ -301,7 +292,7 @@ export class EnhancedComplianceAgent {
     for (const transaction of transactions) {
       // Check if transaction involved age-restricted items
       const hasAgeRestrictedItems = await this.hasAgeRestrictedItems(
-        transaction.items.map(item => item.sku),
+        transaction.items.map((item) => item.sku),
       );
 
       if (hasAgeRestrictedItems) {
@@ -320,7 +311,7 @@ export class EnhancedComplianceAgent {
         }
 
         const productTypes = await this.getProductTypesFromSkus(
-          transaction.items.map(item => item.sku),
+          transaction.items.map((item) => item.sku),
         );
 
         details.push({
@@ -346,8 +337,8 @@ export class EnhancedComplianceAgent {
     return {
       summary: {
         totalTransactions: transactions.length,
-        ageVerifiedTransactions: transactions.filter(t => t.ageVerified).length,
-        idScannedTransactions: transactions.filter(t => t.idScanned).length,
+        ageVerifiedTransactions: transactions.filter((t) => t.ageVerified).length,
+        idScannedTransactions: transactions.filter((t) => t.idScanned).length,
         violations,
       },
       details,
@@ -378,7 +369,7 @@ export class EnhancedComplianceAgent {
     });
 
     const types = new Set<string>();
-    products.forEach(p => {
+    products.forEach((p) => {
       if (['beer', 'wine', 'spirits'].includes(p.category)) {
         types.add(p.category);
       }
@@ -437,4 +428,3 @@ export class EnhancedComplianceAgent {
     };
   }
 }
-

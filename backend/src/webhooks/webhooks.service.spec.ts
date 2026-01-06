@@ -86,17 +86,12 @@ describe('WebhooksService', () => {
 
     it('should handle storage errors', async () => {
       mockPrismaService.eventLog.findFirst.mockResolvedValue(null);
-      mockPrismaService.eventLog.create.mockRejectedValue(
-        new Error('Database error'),
-      );
+      mockPrismaService.eventLog.create.mockRejectedValue(new Error('Database error'));
 
       await expect(
-        service.storeWebhookEvent(
-          'stripe',
-          'payment_intent.succeeded',
-          'evt_test_123',
-          { test: 'data' },
-        ),
+        service.storeWebhookEvent('stripe', 'payment_intent.succeeded', 'evt_test_123', {
+          test: 'data',
+        }),
       ).rejects.toThrow('Database error');
     });
   });
@@ -132,14 +127,10 @@ describe('WebhooksService', () => {
     });
 
     it('should handle update errors gracefully', async () => {
-      mockPrismaService.eventLog.update.mockRejectedValue(
-        new Error('Update failed'),
-      );
+      mockPrismaService.eventLog.update.mockRejectedValue(new Error('Update failed'));
 
       // Should not throw
-      await expect(
-        service.markEventProcessed('event_123', true),
-      ).resolves.not.toThrow();
+      await expect(service.markEventProcessed('event_123', true)).resolves.not.toThrow();
     });
   });
 
@@ -186,9 +177,7 @@ describe('WebhooksService', () => {
     });
 
     it('should return empty array on error', async () => {
-      mockPrismaService.eventLog.findMany.mockRejectedValue(
-        new Error('Query failed'),
-      );
+      mockPrismaService.eventLog.findMany.mockRejectedValue(new Error('Query failed'));
 
       const result = await service.getUnprocessedEvents();
 
@@ -236,9 +225,7 @@ describe('WebhooksService', () => {
     });
 
     it('should return zeros on error', async () => {
-      mockPrismaService.eventLog.count.mockRejectedValue(
-        new Error('Query failed'),
-      );
+      mockPrismaService.eventLog.count.mockRejectedValue(new Error('Query failed'));
 
       const result = await service.getWebhookStats();
 

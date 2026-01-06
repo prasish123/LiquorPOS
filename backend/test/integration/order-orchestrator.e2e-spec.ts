@@ -175,9 +175,7 @@ describe('OrderOrchestrator Integration Tests', () => {
   /**
    * Create a valid order DTO for testing
    */
-  function createTestOrderDto(
-    overrides: Partial<CreateOrderDto> = {},
-  ): CreateOrderDto {
+  function createTestOrderDto(overrides: Partial<CreateOrderDto> = {}): CreateOrderDto {
     return {
       locationId: testLocationId,
       terminalId: 'terminal-001',
@@ -401,9 +399,7 @@ describe('OrderOrchestrator Integration Tests', () => {
         ],
       });
 
-      await expect(orchestrator.processOrder(orderDto)).rejects.toThrow(
-        /Insufficient inventory/,
-      );
+      await expect(orchestrator.processOrder(orderDto)).rejects.toThrow(/Insufficient inventory/);
     });
 
     it('should fail when product not found', async () => {
@@ -418,9 +414,7 @@ describe('OrderOrchestrator Integration Tests', () => {
         ],
       });
 
-      await expect(orchestrator.processOrder(orderDto)).rejects.toThrow(
-        /not found/,
-      );
+      await expect(orchestrator.processOrder(orderDto)).rejects.toThrow(/not found/);
     });
 
     it('should not create transaction when inventory check fails', async () => {
@@ -585,9 +579,7 @@ describe('OrderOrchestrator Integration Tests', () => {
       const succeeded = results.filter((r) => r.status === 'fulfilled');
 
       // Verify all successful orders have unique IDs
-      const orderIds = succeeded.map(
-        (r) => (r as PromiseFulfilledResult<any>).value.id,
-      );
+      const orderIds = succeeded.map((r) => (r as PromiseFulfilledResult<any>).value.id);
       const uniqueIds = new Set(orderIds);
 
       expect(uniqueIds.size).toBe(succeeded.length);

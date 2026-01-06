@@ -87,9 +87,7 @@ export class ConexxusOfflineService {
     locationId: string,
     updates: Array<{ sku: string; quantity: number }>,
   ): Promise<string> {
-    this.logger.log(
-      `Queuing inventory update for sync: ${locationId}, ${updates.length} items`,
-    );
+    this.logger.log(`Queuing inventory update for sync: ${locationId}, ${updates.length} items`);
 
     const queueId = await this.offlineQueue.enqueue(
       'conexxus_sync',
@@ -134,9 +132,7 @@ export class ConexxusOfflineService {
       case 'inventory_update':
         // This would call a Conexxus inventory update endpoint
         // For now, we'll just log it
-        this.logger.log(
-          `Syncing inventory update for ${locationId}: ${updates.length} items`,
-        );
+        this.logger.log(`Syncing inventory update for ${locationId}: ${updates.length} items`);
         // await this.conexxusClient.updateInventory(locationId, updates);
         break;
 
@@ -206,12 +202,8 @@ export class ConexxusOfflineService {
       take: 100,
     });
 
-    const successfulSyncs = syncLogs.filter((log) =>
-      log.eventType.endsWith('.success'),
-    );
-    const failedSyncs = syncLogs.filter((log) =>
-      log.eventType.endsWith('.failed'),
-    );
+    const successfulSyncs = syncLogs.filter((log) => log.eventType.endsWith('.success'));
+    const failedSyncs = syncLogs.filter((log) => log.eventType.endsWith('.failed'));
 
     return {
       pendingSyncs: queueMetrics.pending,
@@ -225,9 +217,7 @@ export class ConexxusOfflineService {
   /**
    * Get pending syncs
    */
-  async getPendingSyncs(
-    locationId?: string,
-  ): Promise<
+  async getPendingSyncs(locationId?: string): Promise<
     Array<{
       id: string;
       type: string;
@@ -325,8 +315,7 @@ export class ConexxusOfflineService {
       totalDiscount: transactions.reduce((sum, t) => sum + t.discount, 0),
       averageOrderValue:
         transactions.length > 0
-          ? transactions.reduce((sum, t) => sum + t.total, 0) /
-            transactions.length
+          ? transactions.reduce((sum, t) => sum + t.total, 0) / transactions.length
           : 0,
       itemsSold: transactions.reduce(
         (sum, t) => sum + t.items.reduce((s, i) => s + i.quantity, 0),
@@ -364,12 +353,8 @@ export class ConexxusOfflineService {
       `Queuing end-of-day sync for ${locationId} on ${syncDate.toISOString().split('T')[0]}`,
     );
 
-    const salesData = await this.createSalesDataFromTransactions(
-      locationId,
-      syncDate,
-    );
+    const salesData = await this.createSalesDataFromTransactions(locationId, syncDate);
 
     return this.queueSalesData(salesData);
   }
 }
-

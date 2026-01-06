@@ -55,9 +55,7 @@ describe('PaxTerminalAgent', () => {
         locationId: 'loc-001',
       };
 
-      await expect(agent.registerTerminal(config)).rejects.toThrow(
-        'Terminal ID is required',
-      );
+      await expect(agent.registerTerminal(config)).rejects.toThrow('Terminal ID is required');
     });
 
     it('should reject invalid IP address', async () => {
@@ -70,9 +68,7 @@ describe('PaxTerminalAgent', () => {
         locationId: 'loc-001',
       };
 
-      await expect(agent.registerTerminal(config)).rejects.toThrow(
-        'Invalid IP address format',
-      );
+      await expect(agent.registerTerminal(config)).rejects.toThrow('Invalid IP address format');
     });
 
     it('should reject invalid port', async () => {
@@ -85,9 +81,7 @@ describe('PaxTerminalAgent', () => {
         locationId: 'loc-001',
       };
 
-      await expect(agent.registerTerminal(config)).rejects.toThrow(
-        'Invalid port number',
-      );
+      await expect(agent.registerTerminal(config)).rejects.toThrow('Invalid port number');
     });
   });
 
@@ -195,4 +189,3 @@ describe('PaxTerminalAgent', () => {
     });
   });
 });
-

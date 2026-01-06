@@ -1,4 +1,3 @@
-import React from 'react';
 import './CTA.css';
 
 const CTA: React.FC = () => {
@@ -11,14 +10,19 @@ const CTA: React.FC = () => {
           <a href="#trial" className="btn btn-primary">Start free trial</a>
           <a href="#demo" className="btn btn-secondary">Book a demo</a>
         </div>
-        <div className="cta-contact">
-          <p>
-            <strong>Questions?</strong> Call <a href="tel:5551234567">(555) 123-4567</a> or email <a href="mailto:hello@liquorpos.com">hello@liquorpos.com</a>
-          </p>
-        </div>
+      <div className="cta-contact">
+        <p>
+          <strong>Questions?</strong> Email <a href="mailto:hello@liquorpos.store">hello@liquorpos.store</a>
+        </p>
+      </div>
       </div>
       <footer className="footer">
-        <p>© 2026 LiquorPOS. All rights reserved.</p>
+        <div className="footer-content">
+          <p>© 2026 LiquorPOS. All rights reserved.</p>
+          <p className="footer-contact">
+            <a href="mailto:hello@liquorpos.store">hello@liquorpos.store</a>
+          </p>
+        </div>
       </footer>
     </section>
   );

@@ -73,7 +73,9 @@ export class ReportCacheService {
     try {
       // Note: Redis keys() is not available in all Redis services
       // For production, consider using SCAN instead
-      this.logger.log(`Cache invalidation by location not fully implemented. Invalidating all reports.`);
+      this.logger.log(
+        `Cache invalidation by location not fully implemented. Invalidating all reports.`,
+      );
       // TODO: Implement pattern-based invalidation with SCAN
     } catch (error) {
       this.logger.error(`Cache invalidate by location error: ${error}`);
@@ -112,11 +114,7 @@ export class ReportCacheService {
       [key: string]: any;
     },
   ): string {
-    const parts = [
-      reportType,
-      params.startDate,
-      params.endDate,
-    ];
+    const parts = [reportType, params.startDate, params.endDate];
 
     if (params.locationId) {
       parts.push(`location:${params.locationId}`);
@@ -132,4 +130,3 @@ export class ReportCacheService {
     return parts.join(':');
   }
 }
-

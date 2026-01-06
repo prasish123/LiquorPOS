@@ -1,10 +1,5 @@
 import { Controller, Get, Post, HttpCode, HttpStatus } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiSecurity,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiSecurity } from '@nestjs/swagger';
 import { ConexxusService } from './conexxus.service';
 
 /**
@@ -23,8 +18,7 @@ export class ConexxusController {
   @Get('health')
   @ApiOperation({
     summary: 'Get Conexxus health status',
-    description:
-      'Check the health and connectivity status of the Conexxus integration.',
+    description: 'Check the health and connectivity status of the Conexxus integration.',
   })
   @ApiResponse({
     status: 200,
@@ -82,8 +76,7 @@ export class ConexxusController {
   @Get('metrics')
   @ApiOperation({
     summary: 'Get sync metrics',
-    description:
-      'Retrieve synchronization metrics and history for the Conexxus integration.',
+    description: 'Retrieve synchronization metrics and history for the Conexxus integration.',
   })
   @ApiResponse({
     status: 200,

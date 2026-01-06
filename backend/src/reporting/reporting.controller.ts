@@ -1,11 +1,5 @@
 import { Controller, Get, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ReportingService } from './reporting.service';
 import { ExportService } from './export.service';
@@ -94,9 +88,7 @@ export class ReportingController {
     description: 'Top products report generated successfully',
     type: [ProductPerformanceDto],
   })
-  async getTopProducts(
-    @Query() query: ProductReportQueryDto,
-  ): Promise<ProductPerformanceDto[]> {
+  async getTopProducts(@Query() query: ProductReportQueryDto): Promise<ProductPerformanceDto[]> {
     return this.reportingService.getTopProducts(query);
   }
 
@@ -208,4 +200,3 @@ export class ReportingController {
     }
   }
 }
-

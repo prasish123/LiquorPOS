@@ -535,8 +535,7 @@ export const ERROR_METADATA: Record<ErrorCode, ErrorCodeMetadata> = {
   [ErrorCode.PAYMENT_FAILED]: {
     code: ErrorCode.PAYMENT_FAILED,
     httpStatus: 402,
-    userMessage:
-      'Payment failed. Please try again or use a different payment method',
+    userMessage: 'Payment failed. Please try again or use a different payment method',
     internalMessage: 'Payment processing failed',
     category: 'external',
     retryable: true,
@@ -822,3 +821,4 @@ export const ERROR_METADATA: Record<ErrorCode, ErrorCodeMetadata> = {
     retryable: false,
   },
 };
+

@@ -50,7 +50,7 @@ export interface PaymentRoutingResult {
 
 /**
  * Payment Router Service
- * 
+ *
  * Intelligently routes payment requests to the appropriate payment processor
  * based on:
  * - Payment method (cash, card)
@@ -58,7 +58,7 @@ export interface PaymentRoutingResult {
  * - Terminal capabilities
  * - Processor availability
  * - Business rules and preferences
- * 
+ *
  * Routing Priority:
  * 1. Cash payments -> Always processed locally (captured immediately)
  * 2. Card payments with PAX terminal -> Route to PAX
@@ -84,17 +84,12 @@ export class PaymentRouterService {
   /**
    * Route payment to appropriate processor
    */
-  async routePayment(
-    request: PaymentRoutingRequest,
-  ): Promise<PaymentRoutingResult> {
-    this.logger.log(
-      `Routing payment: ${request.method} payment of $${request.amount}`,
-      {
-        locationId: request.locationId,
-        terminalId: request.terminalId,
-        preferredProcessor: request.preferredProcessor,
-      },
-    );
+  async routePayment(request: PaymentRoutingRequest): Promise<PaymentRoutingResult> {
+    this.logger.log(`Routing payment: ${request.method} payment of $${request.amount}`, {
+      locationId: request.locationId,
+      terminalId: request.terminalId,
+      preferredProcessor: request.preferredProcessor,
+    });
 
     // Determine which processor to use
     const processor = await this.selectProcessor(request);
@@ -135,9 +130,7 @@ export class PaymentRouterService {
   /**
    * Select the appropriate payment processor based on request and system state
    */
-  private async selectProcessor(
-    request: PaymentRoutingRequest,
-  ): Promise<PaymentProcessor> {
+  private async selectProcessor(request: PaymentRoutingRequest): Promise<PaymentProcessor> {
     // If preferred processor is specified and valid, try to use it
     if (request.preferredProcessor) {
       if (await this.isProcessorAvailable(request.preferredProcessor, request)) {
@@ -201,13 +194,14 @@ export class PaymentRouterService {
       case PaymentProcessor.PAX:
         return await this.hasPaxTerminal(request.terminalId);
 
-      case PaymentProcessor.OFFLINE:
+      case PaymentProcessor.OFFLINE: {
         const canProcess = await this.offlinePaymentAgent.canProcessOffline(
           request.amount,
           request.method === 'card' ? 'card' : 'cash',
           request.locationId,
         );
         return canProcess.allowed;
+      }
 
       default:
         return false;
@@ -240,9 +234,7 @@ export class PaymentRouterService {
   /**
    * Route payment to Stripe processor
    */
-  private async routeToStripe(
-    request: PaymentRoutingRequest,
-  ): Promise<PaymentRoutingResult> {
+  private async routeToStripe(request: PaymentRoutingRequest): Promise<PaymentRoutingResult> {
     this.logger.debug('Processing payment via Stripe');
 
     const result = await this.paymentAgent.authorize(
@@ -267,9 +259,7 @@ export class PaymentRouterService {
   /**
    * Route payment to PAX terminal
    */
-  private async routeToPax(
-    request: PaymentRoutingRequest,
-  ): Promise<PaymentRoutingResult> {
+  private async routeToPax(request: PaymentRoutingRequest): Promise<PaymentRoutingResult> {
     this.logger.debug('Processing payment via PAX terminal');
 
     if (!request.terminalId) {
@@ -284,9 +274,7 @@ export class PaymentRouterService {
     });
 
     if (!result.success) {
-      throw new Error(
-        `PAX transaction failed: ${result.responseMessage} (${result.responseCode})`,
-      );
+      throw new Error(`PAX transaction failed: ${result.responseMessage} (${result.responseCode})`);
     }
 
     return {
@@ -309,9 +297,7 @@ export class PaymentRouterService {
   /**
    * Route payment to offline processor
    */
-  private async routeToOffline(
-    request: PaymentRoutingRequest,
-  ): Promise<PaymentRoutingResult> {
+  private async routeToOffline(request: PaymentRoutingRequest): Promise<PaymentRoutingResult> {
     this.logger.debug('Processing payment via offline mode');
 
     const result = await this.offlinePaymentAgent.authorizeOffline(
@@ -340,9 +326,7 @@ export class PaymentRouterService {
   /**
    * Get available processors for a payment request
    */
-  async getAvailableProcessors(
-    request: PaymentRoutingRequest,
-  ): Promise<PaymentProcessor[]> {
+  async getAvailableProcessors(request: PaymentRoutingRequest): Promise<PaymentProcessor[]> {
     const processors: PaymentProcessor[] = [];
 
     for (const processor of Object.values(PaymentProcessor)) {
@@ -358,10 +342,7 @@ export class PaymentRouterService {
    * Get processor health status
    */
   async getProcessorHealth(): Promise<
-    Record<
-      PaymentProcessor,
-      { available: boolean; lastCheck: Date; details?: any }
-    >
+    Record<PaymentProcessor, { available: boolean; lastCheck: Date; details?: any }>
   > {
     return {
       [PaymentProcessor.STRIPE]: {
@@ -386,4 +367,3 @@ export class PaymentRouterService {
     };
   }
 }
-

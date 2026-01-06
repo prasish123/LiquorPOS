@@ -1,4 +1,3 @@
-import React from 'react';
 import './Problem.css';
 
 const Problem: React.FC = () => {

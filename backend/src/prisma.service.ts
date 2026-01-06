@@ -43,7 +43,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     });
 
     const adapter = new PrismaPg(pool);
-    
+
     this.prisma = new PrismaClient({
       log: [
         { level: 'query', emit: 'event' },
@@ -89,26 +89,17 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       },
     };
 
-    const envDefaults =
-      defaults[nodeEnv as keyof typeof defaults] || defaults.development;
+    const envDefaults = defaults[nodeEnv as keyof typeof defaults] || defaults.development;
 
     return {
-      min: parseInt(
-        process.env.DATABASE_POOL_MIN || String(envDefaults.min),
-        10,
-      ),
-      max: parseInt(
-        process.env.DATABASE_POOL_MAX || String(envDefaults.max),
-        10,
-      ),
+      min: parseInt(process.env.DATABASE_POOL_MIN || String(envDefaults.min), 10),
+      max: parseInt(process.env.DATABASE_POOL_MAX || String(envDefaults.max), 10),
       idleTimeout: parseInt(
-        process.env.DATABASE_POOL_IDLE_TIMEOUT ||
-          String(envDefaults.idleTimeout),
+        process.env.DATABASE_POOL_IDLE_TIMEOUT || String(envDefaults.idleTimeout),
         10,
       ),
       connectionTimeout: parseInt(
-        process.env.DATABASE_POOL_CONNECTION_TIMEOUT ||
-          String(envDefaults.connectionTimeout),
+        process.env.DATABASE_POOL_CONNECTION_TIMEOUT || String(envDefaults.connectionTimeout),
         10,
       ),
     };
@@ -263,9 +254,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       const totalConnections = Number(result[0]?.count || 0);
 
       // Query for active connections
-      const activeResult = await this.prisma.$queryRaw<
-        Array<{ count: bigint }>
-      >`
+      const activeResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
         SELECT count(*) as count
         FROM pg_stat_activity
         WHERE datname = current_database()
@@ -311,8 +300,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       const metrics = await this.getPoolMetrics();
 
       // Pool is unhealthy if we're at or near max connections
-      const utilizationPercent =
-        (metrics.totalConnections / metrics.poolSize) * 100;
+      const utilizationPercent = (metrics.totalConnections / metrics.poolSize) * 100;
 
       if (utilizationPercent >= 90) {
         this.logger.warn(

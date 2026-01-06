@@ -19,12 +19,6 @@ import { RedisService } from '../redis/redis.service';
     PrismaService,
     RedisService,
   ],
-  exports: [
-    ReportingService,
-    ExportService,
-    QuickBooksService,
-    XeroService,
-  ],
+  exports: [ReportingService, ExportService, QuickBooksService, XeroService],
 })
 export class ReportingModule {}
-

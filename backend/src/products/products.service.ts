@@ -3,15 +3,8 @@ import { PrismaService } from '../prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { LocalAIService } from '../ai/local-ai.service';
 import { LoggerService } from '../common/logger.service';
-import {
-  CreateProductDto,
-  UpdateProductDto,
-  SearchProductDto,
-} from './dto/product.dto';
-import {
-  NotFoundException as AppNotFoundException,
-  ErrorCode,
-} from '../common/errors';
+import { CreateProductDto, UpdateProductDto, SearchProductDto } from './dto/product.dto';
+import { NotFoundException as AppNotFoundException, ErrorCode } from '../common/errors';
 
 export interface ProductWithScore {
   id: string;
@@ -46,19 +39,16 @@ export class ProductsService {
     await this.redis.clearPattern('products:*');
 
     // Generate search text for vector embeddings
-    const searchText =
-      `${dto.name} ${dto.description || ''} ${dto.category}`.toLowerCase();
+    const searchText = `${dto.name} ${dto.description || ''} ${dto.category}`.toLowerCase();
     // ... rest of create logic
 
     // Generate embedding locally
     let embedding: string | null = null;
     try {
-      const embeddingVector =
-        await this.aiService.generateEmbedding(searchText);
+      const embeddingVector = await this.aiService.generateEmbedding(searchText);
       embedding = JSON.stringify(embeddingVector);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn('Failed to generate local embedding', {
         error: errorMessage,
       });
@@ -136,11 +126,7 @@ export class ProductsService {
     });
 
     if (!product) {
-      throw new AppNotFoundException(
-        ErrorCode.PRODUCT_NOT_FOUND,
-        'Product',
-        id,
-      );
+      throw new AppNotFoundException(ErrorCode.PRODUCT_NOT_FOUND, 'Product', id);
     }
 
     return product;
@@ -159,11 +145,7 @@ export class ProductsService {
     });
 
     if (!product) {
-      throw new AppNotFoundException(
-        ErrorCode.PRODUCT_NOT_FOUND,
-        'Product',
-        sku,
-      );
+      throw new AppNotFoundException(ErrorCode.PRODUCT_NOT_FOUND, 'Product', sku);
     }
 
     return product;
@@ -305,19 +287,14 @@ export class ProductsService {
 
     // Filter for low stock (quantity <= reorderPoint)
     return products.filter((p) =>
-      p.inventory.some(
-        (inv) => inv.reorderPoint !== null && inv.quantity <= inv.reorderPoint,
-      ),
+      p.inventory.some((inv) => inv.reorderPoint !== null && inv.quantity <= inv.reorderPoint),
     );
   }
 
   /**
    * AI-powered semantic search using Local Embeddings (ContextIQ style)
    */
-  async searchWithAI(
-    query: string,
-    limit: number = 20,
-  ): Promise<ProductWithScore[]> {
+  async searchWithAI(query: string, limit: number = 20): Promise<ProductWithScore[]> {
     try {
       // Generate embedding for query
       const queryEmbedding = await this.aiService.generateEmbedding(query);
@@ -342,10 +319,7 @@ export class ProductsService {
           const embeddingStr = product.embedding;
           if (embeddingStr) {
             const productEmbedding = JSON.parse(embeddingStr) as number[];
-            similarity = this.aiService.cosineSimilarity(
-              queryEmbedding,
-              productEmbedding,
-            );
+            similarity = this.aiService.cosineSimilarity(queryEmbedding, productEmbedding);
           }
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (_err) {
@@ -379,13 +353,10 @@ export class ProductsService {
         .sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0))
         .slice(0, limit);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        'AI search failed, falling back to regular search',
-        undefined,
-        { error: errorMessage },
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error('AI search failed, falling back to regular search', undefined, {
+        error: errorMessage,
+      });
       const searchResults = await this.search({ query, limit });
       return searchResults.map((p) => ({ ...p, similarity: 0 }));
     }

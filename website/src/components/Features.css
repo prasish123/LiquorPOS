@@ -12,7 +12,19 @@
   align-items: center;
   margin-bottom: var(--spacing-xl);
   padding: var(--spacing-lg) 0;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.feature-row.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.feature-row:nth-child(1) { transition-delay: 0.1s; }
+.feature-row:nth-child(2) { transition-delay: 0.2s; }
+.feature-row:nth-child(3) { transition-delay: 0.3s; }
 
 .feature-row:last-child {
   margin-bottom: 0;

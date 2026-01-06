@@ -147,21 +147,14 @@ export class OfflineQueueService implements OnModuleInit {
       this.logger.log(`Processing ${pendingOps.length} queued operations`);
 
       // Process operations in parallel (up to MAX_CONCURRENT_OPERATIONS)
-      const results = await Promise.allSettled(
-        pendingOps.map((op) => this.processOperation(op)),
-      );
+      const results = await Promise.allSettled(pendingOps.map((op) => this.processOperation(op)));
 
       const successful = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.filter((r) => r.status === 'rejected').length;
 
-      this.logger.log(
-        `Queue processing completed: ${successful} successful, ${failed} failed`,
-      );
+      this.logger.log(`Queue processing completed: ${successful} successful, ${failed} failed`);
     } catch (error) {
-      this.logger.error(
-        'Error processing queue',
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error('Error processing queue', error instanceof Error ? error.stack : undefined);
     } finally {
       this.isProcessing = false;
     }
@@ -209,8 +202,7 @@ export class OfflineQueueService implements OnModuleInit {
 
       this.logger.log(`Successfully processed ${type} operation ${eventLog.id}`);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(
@@ -253,10 +245,7 @@ export class OfflineQueueService implements OnModuleInit {
    * Execute the actual operation based on type
    * This is a placeholder - actual implementation will be injected via handlers
    */
-  private async executeOperation(
-    type: QueuedOperation['type'],
-    payload: any,
-  ): Promise<void> {
+  private async executeOperation(type: QueuedOperation['type'], payload: any): Promise<void> {
     // This will be implemented by registering handlers
     // For now, we'll just log that the operation would be executed
     this.logger.debug(
@@ -274,18 +263,12 @@ export class OfflineQueueService implements OnModuleInit {
   }
 
   // Handler registry
-  private handlers = new Map<
-    QueuedOperation['type'],
-    (payload: any) => Promise<void>
-  >();
+  private handlers = new Map<QueuedOperation['type'], (payload: any) => Promise<void>>();
 
   /**
    * Register a handler for a specific operation type
    */
-  registerHandler(
-    type: QueuedOperation['type'],
-    handler: (payload: any) => Promise<void>,
-  ): void {
+  registerHandler(type: QueuedOperation['type'], handler: (payload: any) => Promise<void>): void {
     this.handlers.set(type, handler);
     this.logger.log(`Registered handler for ${type} operations`);
   }
@@ -416,4 +399,3 @@ export class OfflineQueueService implements OnModuleInit {
     return retriedCount;
   }
 }
-

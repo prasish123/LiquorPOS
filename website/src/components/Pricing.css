@@ -23,6 +23,19 @@
   max-width: 500px;
   width: 100%;
   box-shadow: 0 12px 40px rgba(0, 113, 227, 0.12);
+  opacity: 0;
+  transform: scale(0.95);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pricing-card.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pricing-card:hover {
+  box-shadow: 0 20px 60px rgba(0, 113, 227, 0.2);
+  transform: scale(1.02);
 }
 
 .pricing-header {
@@ -86,14 +99,48 @@
   color: var(--color-text-secondary);
 }
 
+.pricing-wont-pay {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.pricing-wont-pay h4 {
+  font-size: 15px;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pricing-wont-pay ul {
+  list-style: none;
+}
+
+.pricing-wont-pay li {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  padding: 4px 0;
+}
+
 .pricing-additional {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
   padding: var(--spacing-lg);
   background-color: var(--color-bg-secondary);
   border-radius: var(--radius-md);
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+}
+
+.pricing-additional.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .additional-item h4 {
@@ -113,6 +160,15 @@
   border-radius: var(--radius-md);
   padding: var(--spacing-lg);
   text-align: center;
+  margin-top: var(--spacing-lg);
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s;
+}
+
+.pricing-savings.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .pricing-savings h3 {
@@ -149,10 +205,11 @@
 }
 
 .comparison-value {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: var(--font-weight-bold);
   color: var(--color-text);
   margin-bottom: var(--spacing-xs);
+  word-break: break-word;
 }
 
 .comparison-note {

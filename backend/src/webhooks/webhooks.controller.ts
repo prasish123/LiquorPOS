@@ -11,13 +11,7 @@ import {
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiExcludeEndpoint,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiExcludeEndpoint, ApiBody } from '@nestjs/swagger';
 import { StripeWebhookService } from './stripe-webhook.service';
 import { DeliveryPlatformTransformerService } from './delivery-platform-transformer.service';
 import { OrderOrchestrator } from '../orders/order-orchestrator';
@@ -107,8 +101,7 @@ export class WebhooksController {
       this.logger.log('Stripe webhook processed successfully');
       return { received: true };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Stripe webhook processing failed: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
@@ -116,10 +109,7 @@ export class WebhooksController {
 
       // Return 400 for signature verification failures
       // Stripe will retry on 5xx errors but not 4xx
-      if (
-        errorMessage.includes('signature') ||
-        errorMessage.includes('verification')
-      ) {
+      if (errorMessage.includes('signature') || errorMessage.includes('verification')) {
         throw new BadRequestException('Webhook signature verification failed');
       }
 
@@ -171,9 +161,7 @@ export class WebhooksController {
       // TODO: Verify signature (placeholder for now)
       // await this.verifyUberEatsSignature(signature, payload);
       if (!signature) {
-        this.logger.warn(
-          'Uber Eats signature verification not implemented - accepting webhook',
-        );
+        this.logger.warn('Uber Eats signature verification not implemented - accepting webhook');
       }
 
       // Store webhook event for audit trail and idempotency
@@ -194,8 +182,7 @@ export class WebhooksController {
       }
 
       // Transform to CreateOrderDto
-      const createOrderDto =
-        await this.deliveryTransformer.transformUberEatsOrder(payload);
+      const createOrderDto = await this.deliveryTransformer.transformUberEatsOrder(payload);
 
       // Process through OrderOrchestrator
       const order = await this.orderOrchestrator.processOrder(createOrderDto);
@@ -203,14 +190,11 @@ export class WebhooksController {
       // Mark event as processed
       await this.webhooksService.markEventProcessed(eventId, true);
 
-      this.logger.log(
-        `Uber Eats order ${payload.order_id} processed successfully → ${order.id}`,
-      );
+      this.logger.log(`Uber Eats order ${payload.order_id} processed successfully → ${order.id}`);
 
       return { received: true, orderId: order.id };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Uber Eats webhook processing failed: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
@@ -273,9 +257,7 @@ export class WebhooksController {
       // TODO: Verify signature (placeholder for now)
       // await this.verifyDoorDashSignature(signature, payload);
       if (!signature) {
-        this.logger.warn(
-          'DoorDash signature verification not implemented - accepting webhook',
-        );
+        this.logger.warn('DoorDash signature verification not implemented - accepting webhook');
       }
 
       // Store webhook event for audit trail and idempotency
@@ -296,8 +278,7 @@ export class WebhooksController {
       }
 
       // Transform to CreateOrderDto
-      const createOrderDto =
-        await this.deliveryTransformer.transformDoorDashOrder(payload);
+      const createOrderDto = await this.deliveryTransformer.transformDoorDashOrder(payload);
 
       // Process through OrderOrchestrator
       const order = await this.orderOrchestrator.processOrder(createOrderDto);
@@ -305,14 +286,11 @@ export class WebhooksController {
       // Mark event as processed
       await this.webhooksService.markEventProcessed(eventId, true);
 
-      this.logger.log(
-        `DoorDash order ${payload.order_id} processed successfully → ${order.id}`,
-      );
+      this.logger.log(`DoorDash order ${payload.order_id} processed successfully → ${order.id}`);
 
       return { received: true, orderId: order.id };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `DoorDash webhook processing failed: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,

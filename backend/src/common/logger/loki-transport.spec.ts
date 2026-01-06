@@ -10,12 +10,12 @@ describe('LokiTransport', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     mockPost = jest.fn().mockResolvedValue({ data: 'ok' });
     mockCreate = jest.fn().mockReturnValue({
       post: mockPost,
     });
-    
+
     (axios.create as jest.Mock) = mockCreate;
 
     transport = new LokiTransport({
@@ -39,7 +39,7 @@ describe('LokiTransport', () => {
                 stream: expect.objectContaining({ level: 'info' }),
               }),
             ]),
-          })
+          }),
         );
         done();
       });
@@ -49,7 +49,7 @@ describe('LokiTransport', () => {
       // Close previous transport and clear mocks
       transport.close();
       jest.clearAllMocks();
-      
+
       transport = new LokiTransport({
         host: 'http://localhost:3100',
         batching: false,
@@ -68,7 +68,7 @@ describe('LokiTransport', () => {
                 }),
               }),
             ]),
-          })
+          }),
         );
         done();
       });
@@ -130,9 +130,7 @@ describe('LokiTransport', () => {
       transport.log({ level: 'info', message: 'log2' }, () => {});
       transport.log({ level: 'info', message: 'log3' }, () => {
         const call = mockPost.mock.calls[0][1];
-        const messages = call.streams.map((s: any) => 
-          JSON.parse(s.values[0][1]).message
-        );
+        const messages = call.streams.map((s: any) => JSON.parse(s.values[0][1]).message);
         expect(messages).toEqual(['log1', 'log2', 'log3']);
         done();
       });
@@ -148,7 +146,7 @@ describe('LokiTransport', () => {
       transport.log({ level: 'error', message: 'test' }, () => {});
 
       // Wait for retries to complete (1000ms initial delay)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Should have retried
       expect(mockPost).toHaveBeenCalledTimes(2);
@@ -156,7 +154,7 @@ describe('LokiTransport', () => {
 
     it('should use exponential backoff', async () => {
       jest.useFakeTimers();
-      
+
       mockPost.mockRejectedValue(new Error('Network error'));
 
       const promise = new Promise<void>((resolve) => {
@@ -188,7 +186,7 @@ describe('LokiTransport', () => {
       await expect(
         new Promise<void>((resolve) => {
           transport.log({ level: 'error', message: 'test' }, resolve);
-        })
+        }),
       ).resolves.not.toThrow();
     });
 
@@ -198,7 +196,7 @@ describe('LokiTransport', () => {
       transport.log({ level: 'error', message: 'test' }, () => {});
 
       // Wait for all retries to complete (1000 + 2000 + 4000 = 7000ms + buffer)
-      await new Promise(resolve => setTimeout(resolve, 8000));
+      await new Promise((resolve) => setTimeout(resolve, 8000));
 
       // Should have tried: initial + 3 retries = 4 times
       expect(mockPost).toHaveBeenCalledTimes(4);
@@ -215,15 +213,15 @@ describe('LokiTransport', () => {
       }
 
       // Wait for all retries to complete
-      await new Promise(resolve => setTimeout(resolve, 8000));
+      await new Promise((resolve) => setTimeout(resolve, 8000));
 
       // Circuit should be open, next log should be dropped
       const initialCallCount = mockPost.mock.calls.length;
-      
+
       transport.log({ level: 'error', message: 'dropped' }, () => {});
 
       // Wait a bit to ensure no new calls
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should not have tried to send (circuit open)
       expect(mockPost).toHaveBeenCalledTimes(initialCallCount);
@@ -235,15 +233,15 @@ describe('LokiTransport', () => {
         .mockResolvedValueOnce({ data: 'ok' });
 
       transport.log({ level: 'error', message: 'test1' }, () => {});
-      
+
       // Wait for retry
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       transport.log({ level: 'info', message: 'test2' }, () => {});
       transport.log({ level: 'info', message: 'test3' }, () => {});
 
       // Wait for all to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should have sent the last log
       expect(mockPost).toHaveBeenCalled();
@@ -251,7 +249,7 @@ describe('LokiTransport', () => {
 
     it('should transition to half-open after timeout', async () => {
       jest.useFakeTimers();
-      
+
       mockPost.mockRejectedValue(new Error('Network error'));
 
       // Trigger 5 failures to open circuit
@@ -273,10 +271,7 @@ describe('LokiTransport', () => {
       });
 
       // Should have tried to send
-      expect(mockPost).toHaveBeenCalledWith(
-        '/loki/api/v1/push',
-        expect.any(Object)
-      );
+      expect(mockPost).toHaveBeenCalledWith('/loki/api/v1/push', expect.any(Object));
 
       jest.useRealTimers();
     });
@@ -298,9 +293,7 @@ describe('LokiTransport', () => {
       transport.log({ level: 'info', message: 'log2' }, () => {});
       transport.log({ level: 'info', message: 'log3' }, () => {});
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Loki queue full, dropping oldest logs'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Loki queue full, dropping oldest logs');
 
       consoleSpy.mockRestore();
     });
@@ -323,9 +316,7 @@ describe('LokiTransport', () => {
       transport.close();
 
       const call = mockPost.mock.calls[0][1];
-      const messages = call.streams.map((s: any) => 
-        JSON.parse(s.values[0][1]).message
-      );
+      const messages = call.streams.map((s: any) => JSON.parse(s.values[0][1]).message);
 
       // Should have log2 and log3 (log1 was dropped)
       expect(messages).toEqual(['log2', 'log3']);
@@ -374,7 +365,7 @@ describe('LokiTransport', () => {
 
     it('should handle very long log message', (done) => {
       const longMessage = 'a'.repeat(10000);
-      
+
       transport.log({ level: 'info', message: longMessage }, () => {
         const call = mockPost.mock.calls[0][1];
         const logValue = JSON.parse(call.streams[0].values[0][1]);
@@ -385,7 +376,7 @@ describe('LokiTransport', () => {
 
     it('should handle special characters in message', (done) => {
       const message = 'Test "quotes" and \'apostrophes\' and \n newlines';
-      
+
       transport.log({ level: 'info', message }, () => {
         const call = mockPost.mock.calls[0][1];
         const logValue = JSON.parse(call.streams[0].values[0][1]);
@@ -395,16 +386,18 @@ describe('LokiTransport', () => {
     });
 
     it('should handle undefined values in log', (done) => {
-      transport.log({ 
-        level: 'info', 
-        message: 'test',
-        undefinedValue: undefined,
-        nullValue: null,
-      }, () => {
-        expect(mockPost).toHaveBeenCalled();
-        done();
-      });
+      transport.log(
+        {
+          level: 'info',
+          message: 'test',
+          undefinedValue: undefined,
+          nullValue: null,
+        },
+        () => {
+          expect(mockPost).toHaveBeenCalled();
+          done();
+        },
+      );
     });
   });
 });
-

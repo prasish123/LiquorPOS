@@ -158,3 +158,5 @@ Start-Process "http://localhost:3001"
 Write-Host "`n✓ All done! Grafana should open in your browser." -ForegroundColor Green
 Write-Host "If not, manually open: http://localhost:3001`n" -ForegroundColor Yellow
 
+
+

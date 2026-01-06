@@ -72,9 +72,7 @@ describe('CSRF Protection (e2e)', () => {
 
   describe('CSRF Token Retrieval', () => {
     it('should get CSRF token from /auth/csrf-token', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/auth/csrf-token')
-        .expect(200);
+      const response = await request(app.getHttpServer()).get('/auth/csrf-token').expect(200);
 
       expect(response.body).toHaveProperty('csrfToken');
       csrfToken = response.body.csrfToken;
@@ -82,9 +80,7 @@ describe('CSRF Protection (e2e)', () => {
       // Extract CSRF cookie
       const cookies = response.headers['set-cookie'];
       expect(cookies).toBeDefined();
-      const csrfCookieHeader = cookies.find((c: string) =>
-        c.startsWith('csrf-token='),
-      );
+      const csrfCookieHeader = cookies.find((c: string) => c.startsWith('csrf-token='));
       expect(csrfCookieHeader).toBeDefined();
       csrfCookie = csrfCookieHeader.split(';')[0].split('=')[1];
     });
@@ -94,9 +90,7 @@ describe('CSRF Protection (e2e)', () => {
 
       const cookies = response.headers['set-cookie'];
       expect(cookies).toBeDefined();
-      const csrfCookieHeader = cookies.find((c: string) =>
-        c.startsWith('csrf-token='),
-      );
+      const csrfCookieHeader = cookies.find((c: string) => c.startsWith('csrf-token='));
       expect(csrfCookieHeader).toBeDefined();
     });
   });
@@ -131,14 +125,10 @@ describe('CSRF Protection (e2e)', () => {
 
     it('should accept login request with valid CSRF token', async () => {
       // First get a CSRF token
-      const tokenResponse = await request(app.getHttpServer()).get(
-        '/auth/csrf-token',
-      );
+      const tokenResponse = await request(app.getHttpServer()).get('/auth/csrf-token');
 
       const cookies = tokenResponse.headers['set-cookie'];
-      const csrfCookieHeader = cookies.find((c: string) =>
-        c.startsWith('csrf-token='),
-      );
+      const csrfCookieHeader = cookies.find((c: string) => c.startsWith('csrf-token='));
       const token = csrfCookieHeader.split(';')[0].split('=')[1];
 
       // Now attempt login with CSRF token
@@ -162,13 +152,9 @@ describe('CSRF Protection (e2e)', () => {
 
     beforeAll(async () => {
       // Get CSRF token
-      const tokenResponse = await request(app.getHttpServer()).get(
-        '/auth/csrf-token',
-      );
+      const tokenResponse = await request(app.getHttpServer()).get('/auth/csrf-token');
       const cookies = tokenResponse.headers['set-cookie'];
-      const csrfCookieHeader = cookies.find((c: string) =>
-        c.startsWith('csrf-token='),
-      );
+      const csrfCookieHeader = cookies.find((c: string) => c.startsWith('csrf-token='));
       csrfToken = csrfCookieHeader.split(';')[0].split('=')[1];
 
       // Login to get auth token
@@ -183,9 +169,7 @@ describe('CSRF Protection (e2e)', () => {
 
       if (loginResponse.status === 200) {
         const authCookies = loginResponse.headers['set-cookie'];
-        const authCookieHeader = authCookies.find((c: string) =>
-          c.startsWith('access_token='),
-        );
+        const authCookieHeader = authCookies.find((c: string) => c.startsWith('access_token='));
         authToken = authCookieHeader.split(';')[0].split('=')[1];
       }
     });
@@ -240,14 +224,10 @@ describe('CSRF Protection (e2e)', () => {
 
   describe('CSRF Token Cookie Properties', () => {
     it('should set csrf-token cookie with correct properties', async () => {
-      const response = await request(app.getHttpServer()).get(
-        '/auth/csrf-token',
-      );
+      const response = await request(app.getHttpServer()).get('/auth/csrf-token');
 
       const cookies = response.headers['set-cookie'];
-      const csrfCookieHeader = cookies.find((c: string) =>
-        c.startsWith('csrf-token='),
-      );
+      const csrfCookieHeader = cookies.find((c: string) => c.startsWith('csrf-token='));
 
       expect(csrfCookieHeader).toContain('SameSite=Strict');
       // httpOnly should be false so JavaScript can read it

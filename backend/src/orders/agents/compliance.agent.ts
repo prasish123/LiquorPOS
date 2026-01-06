@@ -40,9 +40,7 @@ export class ComplianceAgent {
 
     // If age verification is required but not provided
     if (!ageVerified) {
-      throw new ForbiddenException(
-        'Age verification required for alcohol purchases',
-      );
+      throw new ForbiddenException('Age verification required for alcohol purchases');
     }
 
     // If customer ID is provided, verify their age on record
@@ -102,10 +100,7 @@ export class ComplianceAgent {
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
 
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
 

@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis, { RedisOptions } from 'ioredis';
 
 export interface CacheMetrics {
@@ -303,10 +298,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       // Get current master info using call method
 
-      const info = await (this.client as any).sentinel(
-        'master',
-        this.sentinelInfo.masterName!,
-      );
+      const info = await (this.client as any).sentinel('master', this.sentinelInfo.masterName!);
       if (info && Array.isArray(info)) {
         const host = info[3] as string; // ip field
         const port = parseInt(info[5] as string, 10); // port field
@@ -346,8 +338,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.metrics.misses++;
         return null;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         this.logger.warn(`Redis get failed: ${errorMessage}`);
         this.metrics.errors++;
         this.lastError = errorMessage;
@@ -375,11 +366,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   /**
    * Set value in cache with TTL (with fallback to in-memory cache)
    */
-  async set(
-    key: string,
-    value: string,
-    ttlSeconds: number = 3600,
-  ): Promise<void> {
+  async set(key: string, value: string, ttlSeconds: number = 3600): Promise<void> {
     this.metrics.sets++;
 
     // Try Redis first if connected
@@ -432,9 +419,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   async clearPattern(pattern: string): Promise<void> {
     // Clear matching keys from memory cache
-    const regex = new RegExp(
-      '^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
-    );
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
     for (const key of this.memoryCache.keys()) {
       if (regex.test(key)) {
         this.memoryCache.delete(key);

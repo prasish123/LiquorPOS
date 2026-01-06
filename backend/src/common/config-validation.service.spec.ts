@@ -52,22 +52,16 @@ describe('ConfigValidationService', () => {
 
     it('should fail if AUDIT_LOG_ENCRYPTION_KEY is wrong length', () => {
       // 16 bytes instead of 32
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(16),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(16)).toString('base64');
 
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('must be 32 bytes'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('must be 32 bytes'));
     });
 
     it('should pass with valid AUDIT_LOG_ENCRYPTION_KEY', () => {
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
 
       const result = service.validateEnvironment();
@@ -79,18 +73,14 @@ describe('ConfigValidationService', () => {
   describe('ALLOWED_ORIGINS validation', () => {
     beforeEach(() => {
       // Set required encryption key
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
     });
 
     it('should fail if ALLOWED_ORIGINS is missing', () => {
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('ALLOWED_ORIGINS is required'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('ALLOWED_ORIGINS is required'));
     });
 
     it('should fail if ALLOWED_ORIGINS is empty string', () => {
@@ -99,9 +89,7 @@ describe('ConfigValidationService', () => {
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('ALLOWED_ORIGINS is required'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('ALLOWED_ORIGINS is required'));
     });
 
     it('should fail if ALLOWED_ORIGINS contains invalid URLs', () => {
@@ -110,9 +98,7 @@ describe('ConfigValidationService', () => {
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('invalid URLs'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('invalid URLs'));
     });
 
     it('should pass with single valid origin', () => {
@@ -124,19 +110,15 @@ describe('ConfigValidationService', () => {
     });
 
     it('should pass with multiple valid origins', () => {
-      process.env.ALLOWED_ORIGINS =
-        'http://localhost:5173,https://app.example.com';
+      process.env.ALLOWED_ORIGINS = 'http://localhost:5173,https://app.example.com';
 
       const result = service.validateEnvironment();
 
-      expect(result.config.ALLOWED_ORIGINS).toBe(
-        'http://localhost:5173,https://app.example.com',
-      );
+      expect(result.config.ALLOWED_ORIGINS).toBe('http://localhost:5173,https://app.example.com');
     });
 
     it('should handle origins with trailing/leading spaces', () => {
-      process.env.ALLOWED_ORIGINS =
-        ' http://localhost:5173 , https://app.example.com ';
+      process.env.ALLOWED_ORIGINS = ' http://localhost:5173 , https://app.example.com ';
 
       const result = service.validateEnvironment();
 
@@ -147,9 +129,7 @@ describe('ConfigValidationService', () => {
   describe('JWT_SECRET validation', () => {
     beforeEach(() => {
       // Set required variables
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
     });
 
@@ -161,9 +141,7 @@ describe('ConfigValidationService', () => {
       expect(result.valid).toBe(true);
       expect(result.config.JWT_SECRET).toBeDefined();
       expect(result.config.JWT_SECRET!.length).toBeGreaterThan(32);
-      expect(result.warnings).toContainEqual(
-        expect.stringContaining('Auto-generated'),
-      );
+      expect(result.warnings).toContainEqual(expect.stringContaining('Auto-generated'));
     });
 
     it('should fail in production if JWT_SECRET is missing', () => {
@@ -173,9 +151,7 @@ describe('ConfigValidationService', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual(
-        expect.stringContaining(
-          'JWT_SECRET must be explicitly set in production',
-        ),
+        expect.stringContaining('JWT_SECRET must be explicitly set in production'),
       );
     });
 
@@ -185,9 +161,7 @@ describe('ConfigValidationService', () => {
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('default insecure value'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('default insecure value'));
     });
 
     it('should warn if JWT_SECRET is too short', () => {
@@ -212,9 +186,7 @@ describe('ConfigValidationService', () => {
   describe('STRIPE_SECRET_KEY validation', () => {
     beforeEach(() => {
       // Set required variables
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
     });
 
@@ -232,9 +204,7 @@ describe('ConfigValidationService', () => {
 
       const result = service.validateEnvironment();
 
-      expect(result.warnings).toContainEqual(
-        expect.stringContaining('unexpected format'),
-      );
+      expect(result.warnings).toContainEqual(expect.stringContaining('unexpected format'));
     });
 
     it('should warn if using test key in production', () => {
@@ -269,18 +239,14 @@ describe('ConfigValidationService', () => {
   describe('DATABASE_URL validation', () => {
     beforeEach(() => {
       // Set required variables
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
     });
 
     it('should warn if DATABASE_URL is missing', () => {
       const result = service.validateEnvironment();
 
-      expect(result.warnings).toContainEqual(
-        expect.stringContaining('DATABASE_URL not set'),
-      );
+      expect(result.warnings).toContainEqual(expect.stringContaining('DATABASE_URL not set'));
     });
 
     it('should pass with DATABASE_URL set', () => {
@@ -288,18 +254,14 @@ describe('ConfigValidationService', () => {
 
       const result = service.validateEnvironment();
 
-      expect(result.config.DATABASE_URL).toBe(
-        'postgresql://user:pass@localhost:5432/db',
-      );
+      expect(result.config.DATABASE_URL).toBe('postgresql://user:pass@localhost:5432/db');
     });
   });
 
   describe('PORT validation', () => {
     beforeEach(() => {
       // Set required variables
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
     });
 
@@ -309,9 +271,7 @@ describe('ConfigValidationService', () => {
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('valid port number'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('valid port number'));
     });
 
     it('should fail if PORT is out of range', () => {
@@ -320,9 +280,7 @@ describe('ConfigValidationService', () => {
       const result = service.validateEnvironment();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual(
-        expect.stringContaining('valid port number'),
-      );
+      expect(result.errors).toContainEqual(expect.stringContaining('valid port number'));
     });
 
     it('should pass with valid PORT', () => {
@@ -338,15 +296,11 @@ describe('ConfigValidationService', () => {
     it('should throw error if validation fails', () => {
       // Missing required variables
 
-      expect(() => service.validateAndThrow()).toThrow(
-        'Environment validation failed',
-      );
+      expect(() => service.validateAndThrow()).toThrow('Environment validation failed');
     });
 
     it('should return config if validation succeeds', () => {
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
       process.env.JWT_SECRET = 'secure-secret-key-for-testing';
 
@@ -360,9 +314,7 @@ describe('ConfigValidationService', () => {
 
   describe('Complete validation scenarios', () => {
     it('should pass with all required variables set', () => {
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
       process.env.JWT_SECRET = 'secure-secret-key-for-testing';
 
@@ -382,9 +334,7 @@ describe('ConfigValidationService', () => {
     });
 
     it('should collect warnings even when valid', () => {
-      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from(
-        'a'.repeat(32),
-      ).toString('base64');
+      process.env.AUDIT_LOG_ENCRYPTION_KEY = Buffer.from('a'.repeat(32)).toString('base64');
       process.env.ALLOWED_ORIGINS = 'http://localhost:5173';
       process.env.JWT_SECRET = 'secure-secret-key-for-testing';
       // STRIPE_SECRET_KEY missing - should warn

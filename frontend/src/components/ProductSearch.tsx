@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Scan, Package, Wine, Beer, Martini, GlassWater } from 'lucide-react';
 import { useProductsStore } from '../store/productsStore';
 import { useCartStore } from '../store/cartStore';
@@ -24,6 +24,9 @@ export function ProductSearch() {
   const [results, setResults] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState({ name: 'All', icon: Package });
+  
+  // FIX RED-001: Debounce protection against double-clicks
+  const lastClickTimeRef = useRef<Record<string, number>>({});
 
   const searchProducts = useProductsStore((state) => state.searchProducts);
   const addItem = useCartStore((state) => state.addItem);
@@ -41,6 +44,14 @@ export function ProductSearch() {
   }, [query, searchProducts]);
 
   const handleAddToCart = (product: Product) => {
+    // FIX RED-001: Prevent duplicate adds within 500ms
+    const now = Date.now();
+    const lastClick = lastClickTimeRef.current[product.sku] || 0;
+    if (now - lastClick < 500) {
+      return; // Ignore rapid clicks
+    }
+    lastClickTimeRef.current[product.sku] = now;
+
     addItem(product);
     useToastStore.getState().addToast({
       type: 'success',
